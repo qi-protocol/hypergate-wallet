@@ -1,5 +1,7 @@
 # Superhack Project
 
+## Hypergate Wallet
+
 TODO
 
 - [x] Init repo (Safe, 4337, Forge, OZ)
