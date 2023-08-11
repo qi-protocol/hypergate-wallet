@@ -1,19 +1,20 @@
 # Superhack Project
 
 TODO
-[x] Init repo (Safe, 4337, Forge, OZ)
-[] Implement baseWallet + Safe + SafeGuardian
-[] Implement flow diagram
-[] Implement ETH - OP L2 execution function
-[] Implement OP L2 - ETH execution function
-[] Implement OP L2 - OP L2 execution function
-[] Create userop test to CrosschainPaymaster
-[] Create userop test to AccountEscrow (Only applicable L1-L1 L2-L2)
-[] If possible implement route (L2-L1-L2 transaction)
-[] Create flattened contracts directory
-[] Deploy and verify flattened contracts
-[] Write Docs
-[] Apply to bounties
+
+- [x] Init repo (Safe, 4337, Forge, OZ)
+- [] Implement baseWallet + Safe + SafeGuardian
+- [] Implement flow diagram
+- [] Implement ETH - OP L2 execution function
+- [] Implement OP L2 - ETH execution function
+- [] Implement OP L2 - OP L2 execution function
+- [] Create userop test to CrosschainPaymaster
+- [] Create userop test to AccountEscrow (Only applicable L1-L1 L2-L2)
+- [] If possible implement route (L2-L1-L2 transaction)
+- [] Create flattened contracts directory
+- [] Deploy and verify flattened contracts
+- [] Write Docs
+- [] Apply to bounties
 
 
 ## Targeted Bounties:
