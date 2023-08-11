@@ -71,3 +71,20 @@ Safe will be giving $5,000 in total for the best hacks using Safe{Core}. To be e
 * Safe{Core} Protocol (integrating or implementing any part of the Protocol). Check this demo app to get an overview of what can be done.
 * Safe{Core} Account Abstraction SDK (integrating at least one of the existing kits). Check this demo app to get an overview of what can be done.
 
+
+
+Wallet Details
+
+| Wallet      | Code       |
+| ----------- | ---------- |
+| Safe        | 1          |
+
+| Safe Type   | Code       |
+| ----------- | ---------- |
+| Default     | 0x01       |
+
+### DB Format
+
+| public key                                 | nonce        | wallet    | type      |
+| ------------------------------------------ | ------------ | --------- | --------- |
+| 0xfF65689a4AEB6EaDd18caD2dE0022f8Aa18b67de | 0            | 1         | 0x1       |
