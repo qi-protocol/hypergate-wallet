@@ -7,7 +7,7 @@ forge-std/=lib/forge-std/src/
 @oppenzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts
 @safe/=lib/safe-core-sdk/packages/contracts/safe_V1_1_1
 
-@ccip/=lib/ccip-starter-kit-foundry/scripts
+@ccip/=lib/ccip-starter-kit-foundry/src
 
 @utils/=src/utils/
 @interfaces/=src/interfaces/

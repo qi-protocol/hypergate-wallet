@@ -40,6 +40,7 @@ contract TestEscrow is BasicMessageReceiver {
         lock = false;
     }
 
+    // extend lock by calling with value: 0
     function Deposit(address account) public payable locked {
         Escrow storage accountInfo_ = accountInfo[account];
         accountInfo_.deadline = block.timestamp + 1200;
