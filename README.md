@@ -1,12 +1,42 @@
-# Superhack Project
+Hypergate Wallet: The Ultimate Hyper-Crosschain Wallet Solution 🚀
 
-## Hypergate Wallet
+Imagine a future where your grandma uses crypto to buy her favorite cookies, and she doesn't even realize it's powered by blockchain. Sounds like sci-fi, right? 🌌
+
+Is this achievable?
+Absolutely! But let's be real, we're still paving the yellow brick road to that future.
+Where Are We Now? 🌍
+
+We're surrounded by a myriad of L1s, innovative L1-L2 scaling solutions, and the budding world of ERC4337 (account abstraction). It's like being in a candy store with endless choices!
+
+But here's the twist:
+
+    🌀 Interoperability is possible, but having a smooth chat between chains feels like trying to order a pizza in a language you don't speak. And if you want to make a move from your wallet to another chain? You better be ready for some bridge-trekking!
+
+    🚀 Thinking one EVM blockchain can do it all? Remember the skyrocketing gas prices of Ethereum Mainnet in 2021? That's like expecting a single superhero to save the world every time. Different chains have their strengths, and it's all about leveraging them.
+
+    🌉 But, there's a catch! While we can shout across chains, it's like yelling across a canyon. If your money's on one side and you want to make magic on the other, you're in for a hike. Especially if you're into minting those shiny NFTs.
+
+Enter Hypergate Wallet 🌟
+
+It's not just another wallet. Think of it as your personal crypto wizard 🧙‍♂️. It's a crosschain account abstraction wallet control system (phew, that's a mouthful!).
+
+What's the magic?
+✨ Users craft their own wallets, sprinkling in features as they like.
+✨ Our system lets you whip up your own transactions. It's like baking – but instead of adding chocolate chips or nuts, you're adding hooks and controls.
+✨ And the cherry on top? Our special crosschain paymaster system. It's like having a genie granting wishes on where, how, and from where you execute transactions.
+
+In a nutshell: Hypergate Wallet is your ticket to a seamless, chain-agnostic crypto experience. So, are you ready to jump into the future? 🚀
+
 
 TODO
 
 - [x] Init repo (Safe, 4337, Forge, OZ)
 - [ ] Implement baseWallet + Safe + SafeGuardian
-- [ ] Implement flow diagram
+- [x] Implement flow diagram L1-L1
+- [ ] Implement flow diagram L2-L1
+- [ ] Implement flow diagram L1-L2
+- [ ] Implement flow diagram L2-L1-L1-L2
+- [x] Implement ETH - ETH execution function
 - [ ] Implement ETH - OP L2 execution function
 - [ ] Implement OP L2 - ETH execution function
 - [ ] Implement OP L2 - OP L2 execution function
@@ -15,7 +45,7 @@ TODO
 - [ ] If possible implement route (L2-L1-L2 transaction)
 - [ ] Create flattened contracts directory
 - [ ] Deploy and verify flattened contracts
-- [ ] Write Docs
+- [x] Write Docs
 - [ ] Apply to bounties
 
 
@@ -73,7 +103,8 @@ Safe will be giving $5,000 in total for the best hacks using Safe{Core}. To be e
 
 
 
-Wallet Details
+
+### Wallet Details
 
 | Wallet      | Code       |
 | ----------- | ---------- |
