@@ -16,6 +16,7 @@ contract swap is Test {
     UniswapV2Router02 public uniswapV2Router02;
     UniswapV2Pair public uniswapV2Pair;
     address owner;
+    address[2] path;
 
     function setUp() public {
         token = new ERC20("TestToken", "TEST");
@@ -40,5 +41,11 @@ contract swap is Test {
         token.transfer(owner, token.balanceOf(owner));
         weth.transfer(owner, token.balanceOf(owner));
         uniswapV2Pair.sync();
+        path[0] = address(weth);
+        path[1] = address(token);
+    }
+
+    function swap_payload(address wallet) public view returns(bytes memory) {
+        return abi.encodeWithSignature("swapExactETHForTokensSupportingFeeOnTransferTokens(uint,address[],address,uint)",0,path,wallet,block.timestamp + 3600);
     }
 }
