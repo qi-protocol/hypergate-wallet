@@ -12,7 +12,7 @@ import {SafeProxyFactory} from "lib/safe-contracts/contracts/proxies/SafeProxyFa
 import {HypergateWalletFactory, HypergateWallet} from "contracts/HypergateWalletFactory.sol";
 //import {SimpleAccount, SimpleAccountFactory, UserOperation} from "@erc4337/samples/SimpleAccountFactory.sol";
 //bytes memory initHypergateWallet = abi.encodeWithSelector(0xc4d66de8,address_);
-contract basicTest is Test {
+contract BasicTest is Test {
     using UserOperationLib for UserOperation;
     address internal eoaAddress;
 

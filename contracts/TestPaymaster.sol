@@ -25,11 +25,11 @@ contract TestPaymaster is BasePaymaster {
         ccip_router = ccip_router_;
     }
 
-    function PaymasterAddress(uint64 chainId) public view returns(address) {
+    function paymasterAddress(uint64 chainId) public view returns(address) {
         return paymasterAddress[chainId];
     }
 
-    function AddPaymaster(uint64 chainId, address paymasterAddress_) public onlyOwner {
+    function addPaymaster(uint64 chainId, address paymasterAddress_) public onlyOwner {
         paymasterAddress[chainId] = paymasterAddress_;
     }
 
@@ -79,7 +79,7 @@ contract TestPaymaster is BasePaymaster {
         this.send{value: amount_}(chainId_, target_, abi.encode(userOp));
     }}
 
-    function Withdraw(address target) public onlyOwner() {
+    function withdraw(address target) public onlyOwner() {
         payable(target).call{value: address(this).balance}("");
     }
 

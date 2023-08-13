@@ -150,13 +150,13 @@ contract TestEscrow {
 
 
     // extend lock by calling with value: 0
-    function Deposit(address account) public payable locked {
+    function deposit(address account) public payable locked {
         Escrow storage accountInfo_ = accountInfo[account];
         accountInfo_.deadline = block.timestamp + 1200;
         accountInfo_.balance = accountInfo_.balance + msg.value;
     }
 
-    function Withdraw(address account, uint256 amount) public locked {
+    function withdraw(address account, uint256 amount) public locked {
         Escrow storage accountInfo_ = accountInfo[account];
         if(accountInfo_.deadline > block.timestamp) {
             revert WithdrawRejected("Too early");
@@ -170,7 +170,7 @@ contract TestEscrow {
         }
     }
 
-    function HandleMessage(Client.Any2EVMMessage memory message) payable external locked {
+    function handleMessage(Client.Any2EVMMessage memory message) payable external locked {
         // validate msg.sender is ccip source
         // cast data into userop
         // ignore the rest
@@ -201,7 +201,7 @@ contract TestEscrow {
         }
     }
 
-    function PrintOp(Client.Any2EVMMessage memory message) payable external locked {
+    function printOp(Client.Any2EVMMessage memory message) payable external locked {
         // validate msg.sender is ccip source
         // cast data into userop
         // ignore the rest
@@ -235,7 +235,7 @@ contract TestEscrow {
             });
 
     */
-    function CallPrintOp(Client.Any2EVMMessage memory message) payable external locked {
+    function callPrintOp(Client.Any2EVMMessage memory message) payable external locked {
         // validate msg.sender is ccip source
         // cast data into userop
         // ignore the rest
