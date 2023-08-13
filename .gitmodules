@@ -5,6 +5,3 @@
 	path = lib/safe-contracts
 	url = https://github.com/safe-global/safe-contracts
 	branch = main
-[submodule "lib/safe-contracts2"]
-	path = lib/safe-contracts2
-	url = https://github.com/safe-global/safe-contracts
