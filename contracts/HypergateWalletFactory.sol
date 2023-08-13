@@ -5,9 +5,9 @@ pragma solidity ^0.8.17;
 /* solhint-disable no-inline-assembly */
 /* solhint-disable reason-string */
 
-import "./HypergateWalletProxy.sol";
+import "./HypergateProxy.sol";
 import "./HypergateWallet.sol";
-import "@openzeppelin/contracts/utils/Create2.sol";
+import "lib/openzeppelin-contracts/contracts/utils/Create2.sol";
 
 /**
  * @author  Charles Taylor
@@ -38,7 +38,7 @@ contract HypergateWalletFactory {
      * @notice  deploy the Hypergate Wallet contract using proxy and returns the address of the proxy. should be called by entrypoint with useropeartoin.initcode > 0
      */
     function createWallet(bytes memory _initializer, bytes32 _salt) external returns (address proxy) {
-        bytes memory deploymentData = abi.encodePacked(type(SoulWalletProxy).creationCode, _WALLETIMPL);
+        bytes memory deploymentData = abi.encodePacked(type(HypergateProxy).creationCode, _WALLETIMPL);
         bytes32 salt = _calcSalt(_initializer, _salt);
         assembly ("memory-safe") {
             proxy := create2(0x0, add(deploymentData, 0x20), mload(deploymentData), salt)
