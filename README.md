@@ -30,9 +30,10 @@ TODO
 - [x] Init repo (Safe, 4337, Forge, OZ)
 - [x] Implement baseWallet + Safe + SafeGuardian
 - [x] Implement flow diagram L1-L1
-- [ ] Implement flow diagram L2-L1
-- [ ] Implement flow diagram L1-L2
-- [ ] Implement flow diagram L2-L1-L1-L2
+- [x] Implement flow diagram L2-L1
+- [x] Implement flow diagram L1-L2
+- [x] Implement flow diagram L2-L1-L1-L2
+- [x] Implement Infra diagram
 - [x] Implement ETH - ETH execution function
 - [x] Implement Test: Wallet Generation
 - [ ] Implement Test: TestEscrow HandleMessage
@@ -50,6 +51,8 @@ TODO
 - [x] Write Docs
 - [ ] Apply to bounties
 
+
+[Contribution guidelines for this project](frontend/public/assets/images/L1L2FlowDiagram.png)
 
 ## Targeted Bounties:
 
