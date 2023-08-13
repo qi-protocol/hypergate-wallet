@@ -31,6 +31,7 @@ contract HypergateProxy {
             let _singleton := and(sload(_IMPLEMENTATION_SLOT), 0xffffffffffffffffffffffffffffffffffffffff)
             calldatacopy(0, 0, calldatasize())
             pop(delegatecall(gas(), _singleton, 0, calldatasize(), 0, 0))
+            returndatacopy(0, 0, returndatasize())
             return(0, returndatasize())
         }
     }

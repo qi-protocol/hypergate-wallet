@@ -28,12 +28,13 @@ It's not just another wallet. Think of it as your personal crypto wizard 🧙‍
 TODO
 
 - [x] Init repo (Safe, 4337, Forge, OZ)
-- [ ] Implement baseWallet + Safe + SafeGuardian
+- [x] Implement baseWallet + Safe + SafeGuardian
 - [x] Implement flow diagram L1-L1
 - [ ] Implement flow diagram L2-L1
 - [ ] Implement flow diagram L1-L2
 - [ ] Implement flow diagram L2-L1-L1-L2
 - [x] Implement ETH - ETH execution function
+- [x] Implement Test: Wallet Generation
 - [ ] Implement Test: TestEscrow HandleMessage
 - [ ] Implement Test: TestEscrow PrintOp
 - [ ] Implement Test: TestEscrow CallPrintOp
