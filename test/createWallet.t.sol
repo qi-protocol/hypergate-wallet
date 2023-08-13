@@ -79,9 +79,17 @@ contract BasicTest is Test {
         hypergateWalletFactoryAddress = address(hypergateWalletFactory);
         hypergateWalletAddress = hypergateWalletFactory.createWallet(initHypergateWallet, bytes32(SALT));
         hypergateWallet = HypergateWallet(payable(hypergateWalletAddress));
+
+        safeSingleton = new Safe();
+        safeSingletonAddress = address(safeSingleton);
+        safeProxyFactory = new SafeProxyFactory();
+        safeProxyFactoryAddress = address(safeProxyFactory);
+
     }
 
     function testCreate() public {
+        // scenerio: we already have our Hypergate Wallet
+        //      deploy a Safe Wallet to owner from the Hypergate Wallet
         // console.log("All local EVM:");
         // console.log("EOA: ", eoaAddress);
         // console.log("EntryPoint: ", entryPointAddress);

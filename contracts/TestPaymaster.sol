@@ -25,7 +25,7 @@ contract TestPaymaster is BasePaymaster {
         ccip_router = ccip_router_;
     }
 
-    function paymasterAddress(uint64 chainId) public view returns(address) {
+    function getPaymasterAddress(uint64 chainId) public view returns(address) {
         return paymasterAddress[chainId];
     }
 
