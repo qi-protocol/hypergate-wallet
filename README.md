@@ -34,9 +34,13 @@ TODO
 - [ ] Implement flow diagram L1-L2
 - [ ] Implement flow diagram L2-L1-L1-L2
 - [x] Implement ETH - ETH execution function
+- [ ] Implement Test: TestEscrow HandleMessage
+- [ ] Implement Test: TestEscrow PrintOp
+- [ ] Implement Test: TestEscrow CallPrintOp
 - [ ] Implement ETH - OP L2 execution function
 - [ ] Implement OP L2 - ETH execution function
 - [ ] Implement OP L2 - OP L2 execution function
+- [ ] Create script to test 
 - [ ] Create userop test to CrosschainPaymaster
 - [ ] Create userop test to AccountEscrow (Only applicable L1-L1 L2-L2)
 - [ ] If possible implement route (L2-L1-L2 transaction)
