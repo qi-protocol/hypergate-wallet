@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
 import {PayFeesIn, send, Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 
 // needs to recieve a message from ccip (UserOp, PaymasterAddress)
 // then release locked funds
@@ -16,6 +17,9 @@ contract TestEscrow is BasicMessageReceiver {
 
     mapping(address => Escrow) accountInfo;
     mapping(address => bool) entryPoint;
+    mapping(address => bool) ccipAddress;
+    mapping(address => bool) layerZeroAddress;
+    mapping(address => bool) hyperlaneAddress;
 
     struct Escrow {
         uint256 deadline;
@@ -30,6 +34,14 @@ contract TestEscrow is BasicMessageReceiver {
         uint256 id;
         uint256 chainId;
         address to;
+    }
+
+    struct PaymasterAndData {
+        address paymaster;
+        uint64 chainId;
+        address target;
+        address owner;
+        uint256 amount;
     }
 
     bool lock;
@@ -61,31 +73,101 @@ contract TestEscrow is BasicMessageReceiver {
         }
     }
 
-    function HandleMessage(bytes calldata op) payable external locked {
-        UserOperation userOp = UserOperation(op);
+    function HandleMessage(Client.Any2EVMMessage memory message) payable external locked {
+        // validate msg.sender is ccip source
+        // cast data into userop
+        // ignore the rest
+        if(!ccipAddress[msg.sender]) {
+            revert InvalidCCIPAddress(msg.sender);
+        }
+        UserOperation calldata userOp = UserOperation(message.data);
+        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
 
-        address paymaster_ = address(bytes20(data[:20]));
-        uint64 chainId_ = uint64(bytes8(data[20:28]));
-        address target_ = address(bytes20(data[28:48]));
-        address owner_ = address(bytes20(data[48:68]));
-        uint256 amount_ = uint256(bytes32(data[68:100]));
+        // authenticate the operation
+        bytes32 memory userOpHash = userOp.hash();
+        // need to check safe signature method (maybe ecdsa?)
+        // account == validateSignature from safe
+
+        if(data.chainId != block.chainid) {
+            revert InvalidChain(data.chainId);
+        }
+        if(data.amount < balance(address(this))) {
+            revert BalanceError(data.amount, balance(address(this)));
+        }
+
+        if(data.amount <= accountInfo[data.account])
+        (bool success,) = payable(data.target).call{value: data.amount}("");
+        if(!success) {
+            PaymasterPaymentFailed(data.target, userOp.sender, data.amount);
+        }
+    }
+
+    function PrintOp(Client.Any2EVMMessage memory message) payable external locked {
+        // validate msg.sender is ccip source
+        // cast data into userop
+        // ignore the rest
+        if(!ccipAddress[msg.sender]) {
+            revert InvalidCCIPAddress(msg.sender);
+        }
+        UserOperation calldata userOp = UserOperation(message.data);
+        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
 
         // authenticate the operation
         bytes32 memory userOpHash = userOp.hash();
         // need to check safe signature method (maybe ecdsa?)
 
-        if(chainId_ != block.chainid) {
-            revert InvalidChain();
+        if(data.chainId != block.chainid) {
+            revert InvalidChain(data.chainId);
         }
-        if(amount_ < balance(address(this))) {
-            revert BalanceError(amount_, balance(address(this)));
+        if(data.amount < balance(address(this))) {
+            revert BalanceError(data.amount, balance(address(this)));
+        }
+
+        emit PrintUserOp(userOp, data);
+    }
+//Client.Any2EVMMessage memory message
+/*
+Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(receiver),
+            data: abi.encode(messageText),
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            extraArgs: "",
+            feeToken: payFeesIn == PayFeesIn.LINK ? i_link : address(0)
+        });
+
+*/
+    function CallPrintOp(Client.Any2EVMMessage memory message) payable external locked {
+        // validate msg.sender is ccip source
+        // cast data into userop
+        // ignore the rest
+        if(!ccipAddress[msg.sender]) {
+            revert InvalidCCIPAddress(msg.sender);
+        }
+        UserOperation calldata userOp = UserOperation(message.data);
+        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
+
+        // authenticate the operation
+        bytes32 memory userOpHash = userOp.hash();
+        // need to check safe signature method (maybe ecdsa?)
+
+        if(data.chainId != block.chainid) {
+            revert InvalidChain(data.chainId);
+        }
+        if(data.amount < balance(address(this))) {
+            revert BalanceError(data.amount, balance(address(this)));
         }
     }
 
     error WithdrawRejected(string);
     error TransferFailed();
-    error InvalidChain();
+    error PaymasterPaymentFailed(address paymaster, address account, uint256 amount);
+    error InvalidCCIPAddress(address badSender);
+    error InvalidLayerZeroAddress(address badSender);
+    error InvalidHyperlaneAddress(address badSender);
+    error InvalidChain(address badDestination);
     error BalanceError(uint256 requested, uint256 actual);
+
+    event PrintUserOp(UserOperation userOp, PaymasterAndData paymasterAndData);
 
     fallback() external payable {}
 }
