@@ -40,11 +40,11 @@ contract PrintMessageTest is Test {
     address internal testPrintAddress;
 
     function setUp() public {
-        testEscrow = new TestEscrow();
-        testEscrowAddress = address(testEscrow);
-        testPaymaster = new TestPaymaster();
-        testPaymasterAddress = address(testPaymaster);
-        testPrint = new TestPrint();
-        testPrintAddress = address(testPrint);
+        // testEscrow = new TestEscrow();
+        // testEscrowAddress = address(testEscrow);
+        // testPaymaster = new TestPaymaster();
+        // testPaymasterAddress = address(testPaymaster);
+        // testPrint = new TestPrint();
+        // testPrintAddress = address(testPrint);
     }
 }

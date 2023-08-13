@@ -51,6 +51,9 @@ TODO
 - [x] Write Docs
 - [ ] Apply to bounties
 
+forge script script/deploy.s.sol:Deploy --broadcast --verify --rpc-url ${MODE_TESTNET_RPC_URL}
+
+
 
 [Contribution guidelines for this project](frontend/public/assets/images/L1L2FlowDiagram.png)
 

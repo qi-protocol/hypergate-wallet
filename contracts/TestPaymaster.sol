@@ -33,6 +33,10 @@ contract TestPaymaster is BasePaymaster {
         paymasterAddress[chainId] = paymasterAddress_;
     }
 
+    function setCCIP(address ccip_router_) public onlyOwner {
+        ccip_router = ccip_router_;
+    }
+
     function send(
         uint64 destinationChainSelector,
         address receiver,
