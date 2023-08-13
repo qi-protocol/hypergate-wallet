@@ -22,18 +22,28 @@ contract HypergateWallet is Initializable {
     }
 
     mapping(uint256 => Wallet) _wallet;
-    uint256 nonce;
+    uint256 _nonce;
+    address _owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == _owner);
+        _;
+    }
 
     function initialize(
         address owner_
     ) external initializer {
-        _addOwner(owner_);
+        _owner = owner_;
+    }
+
+    function transferOwnership(address to) external onlyOwner {
+        _owner = to;
     }
 
     function createWallet(address target, bytes calldata data, uint256 amount, uint256 gas) external payable returns(address) {
         (bool success, bytes memory receipt) = target.call{value: amount, gas: gas}(data);
         require(success, "Wallet creation failed");
-        _wallet[nonce] = Wallet(address(bytes20(receipt)), target, tx.origin, block.timestamp, uint256(data[4:]), amount);
+        _wallet[_nonce] = Wallet(address(bytes20(receipt)), target, tx.origin, block.timestamp, uint256(bytes32(data[4:])), amount);
         return address(bytes20(receipt));
     }
 
@@ -49,10 +59,10 @@ contract HypergateWallet is Initializable {
     }
 
     function getNonce() external virtual view returns(uint256) {
-        return nonce;
+        return _nonce;
     }
 
-    function Execute(
+    function execute(
         uint256 gasLimit,
         uint256 amount,
         address target,
@@ -65,7 +75,7 @@ contract HypergateWallet is Initializable {
             return success;
     }
 
-    function SafeExecute(
+    function safeExecute(
         uint256 gasLimit,
         uint256 amount,
         address target, 
@@ -80,7 +90,7 @@ contract HypergateWallet is Initializable {
         }
     }
 
-    function ExecuteWithHook(
+    function executeWithHook(
         uint256 gasLimit,
         uint256 amount,
         address target,
@@ -101,7 +111,7 @@ contract HypergateWallet is Initializable {
             return success;
     }
 
-    function SafeExecuteWithHook(
+    function safeExecuteWithHook(
         uint256 gasLimit,
         uint256 amount,
         address target, 
@@ -161,16 +171,16 @@ contract HypergateWallet is Initializable {
     error HookReverted(uint256 index, bytes data);
 
     // revert call wallet
-    fallback() external payable {
-        // all requests are forwarded to the fallback contract use STATICCALL
-        assembly {
-            /* not memory-safe */
-            calldatacopy(0, 0, calldatasize())
-            let result := staticcall(gas(), fallbackContract, 0, calldatasize(), 0, 0)
-            returndatacopy(0, 0, returndatasize())
-            switch result
-            case 0 { revert(0, returndatasize()) }
-            default { return(0, returndatasize()) }
-        }
-    }
+    // fallback() external payable {
+    //     // all requests are forwarded to the fallback contract use STATICCALL
+    //     assembly {
+    //         /* not memory-safe */
+    //         calldatacopy(0, 0, calldatasize())
+    //         let result := staticcall(gas(), fallbackContract, 0, calldatasize(), 0, 0)
+    //         returndatacopy(0, 0, returndatasize())
+    //         switch result
+    //         case 0 { revert(0, returndatasize()) }
+    //         default { return(0, returndatasize()) }
+    //     }
+    // }
 }

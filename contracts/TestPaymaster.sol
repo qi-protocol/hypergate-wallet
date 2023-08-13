@@ -2,8 +2,9 @@
 pragma solidity ^0.8.17;
 
 import {UserOperation} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
-import {EntryPoint, IEntryPoint, BasePaymaster} from "lib/account-abstraction/contracts/core/BasePaymaster.sol";
-import {PayFeesIn, send, Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
+import {BasePaymaster} from "lib/account-abstraction/contracts/core/BasePaymaster.sol";
+import {EntryPoint, IEntryPoint} from "lib/account-abstraction/contracts/core/EntryPoint.sol";
+import {Client, IRouterClient} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 // needs to recieve a message from ccip (UserOp, PaymasterAddress)
@@ -17,19 +18,18 @@ contract TestPaymaster is BasePaymaster {
     mapping(uint64 => address) paymasterAddress;
     
     bytes4 _selector;
+    address ccip_router;
 
-    IEntryPoint public entryPoint;
-
-    constructor(IEntryPoint entryPoint_) {
+    constructor(IEntryPoint entryPoint_, address ccip_router_) BasePaymaster(entryPoint_) {
         _selector = bytes4(keccak256("HandleMessage(bytes)"));
-        entryPoint = entryPoint_;
+        ccip_router = ccip_router_;
     }
 
-    function PaymasterAddress(uint64 chainId) public pure {
-        return paymasterAddress(chainId);
+    function PaymasterAddress(uint64 chainId) public view returns(address) {
+        return paymasterAddress[chainId];
     }
 
-    function AddPaymaster(uint64 chainId, address paymasterAddress_) {
+    function AddPaymaster(uint64 chainId, address paymasterAddress_) public onlyOwner {
         paymasterAddress[chainId] = paymasterAddress_;
     }
 
@@ -46,17 +46,15 @@ contract TestPaymaster is BasePaymaster {
             feeToken: address(0) // always pay in ETH
         });
 
-        uint256 fee = IRouterClient(i_router).getFee(
+        uint256 fee = IRouterClient(ccip_router).getFee(
             destinationChainSelector,
             message
         );
         
-        messageId = IRouterClient(i_router).ccipSend{value: fee+msg.value}(
+        messageId = IRouterClient(ccip_router).ccipSend{value: fee+msg.value}(
             destinationChainSelector,
             message
         );
-
-        emit MessageSent(messageId);
     }
 
     function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32, uint256 requiredPreFund)
@@ -78,11 +76,11 @@ contract TestPaymaster is BasePaymaster {
         address owner_ = address(bytes20(data[48:68]));
         uint256 amount_ = uint256(bytes32(data[68:100]));
 
-        this.send(chainId_, target_, abi.encode(userOp)){value: amount_};
+        this.send{value: amount_}(chainId_, target_, abi.encode(userOp));
     }}
 
     function Withdraw(address target) public onlyOwner() {
-        payable(target).call{value: balace(address(this))}("");
+        payable(target).call{value: address(this).balance}("");
     }
 
     fallback() external payable {}

@@ -14,8 +14,39 @@ contract TestPrint {
         uint256 amount;
     }
 
-    function PrintOp(UserOperation calldata userOp) payable external {
-        PaymasterAndData paymasterAndData = PaymasterAndData(op.paymasterAndData);
+    function _decodePaymasterAndData(bytes memory data) internal pure returns (PaymasterAndData memory) {
+        require(data.length == 104, "Invalid data length"); // 20 + 8 + 20 + 20 + 32 = 100 bytes
+
+        PaymasterAndData memory result;
+        address paymaster;
+        uint64 chainId;
+        address target;
+        address owner;
+        uint256 amount;
+
+        uint256 len = data.length;
+        bytes memory dataCopy = new bytes(len);
+        assembly {
+            calldatacopy(add(dataCopy, 0x20), 0, len) // Copy calldata to memory
+
+            paymaster := mload(add(dataCopy, 0x20))
+            chainId := mload(add(dataCopy, 0x34))
+            target := mload(add(dataCopy, 0x40))
+            owner := mload(add(dataCopy, 0x60))
+            amount := mload(add(dataCopy, 0x80))
+        }
+
+        result.paymaster = paymaster;
+        result.chainId = chainId;
+        result.target = target;
+        result.owner = owner;
+        result.amount = amount;
+
+        return result;
+    }
+    
+    function printOp(UserOperation calldata userOp) payable external {
+        PaymasterAndData memory paymasterAndData = _decodePaymasterAndData(userOp.paymasterAndData);
         emit PrintUserOp(userOp, paymasterAndData);
     }
 

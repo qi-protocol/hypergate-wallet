@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
-import {PayFeesIn, send, Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
+import {Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 
@@ -12,7 +12,7 @@ import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.s
 // chainid == block.chainid
 // validateSignature == owner
 // transfer amount to paymaster 
-contract TestEscrow is BasicMessageReceiver {
+contract TestEscrow {
     using UserOperationLib for UserOperation;
 
     mapping(address => Escrow) accountInfo;
@@ -52,6 +52,103 @@ contract TestEscrow is BasicMessageReceiver {
         lock = false;
     }
 
+    function _decodePaymasterAndData(bytes memory data) internal pure returns (PaymasterAndData memory) {
+        require(data.length == 104, "Invalid data length"); // 20 + 8 + 20 + 20 + 32 = 100 bytes
+
+        PaymasterAndData memory result;
+        address paymaster;
+        uint64 chainId;
+        address target;
+        address owner;
+        uint256 amount;
+
+        uint256 len = data.length;
+        bytes memory dataCopy = new bytes(len);
+        assembly {
+            calldatacopy(add(dataCopy, 0x20), 0, len) // Copy calldata to memory
+
+            paymaster := mload(add(dataCopy, 0x20))
+            chainId := mload(add(dataCopy, 0x34))
+            target := mload(add(dataCopy, 0x40))
+            owner := mload(add(dataCopy, 0x60))
+            amount := mload(add(dataCopy, 0x80))
+        }
+
+        result.paymaster = paymaster;
+        result.chainId = chainId;
+        result.target = target;
+        result.owner = owner;
+        result.amount = amount;
+
+        return result;
+    }
+
+
+    function _calldataUserOperation(UserOperation memory userop) internal view returns(UserOperation calldata op) {
+        assembly {
+            op := userop
+        }
+    }
+
+    function _decodeUserOperation(bytes memory data) internal pure returns (UserOperation memory) {
+        UserOperation memory result;
+        address sender;
+        uint256 nonce;
+        bytes memory initCode;
+        bytes memory callData;
+        uint256 callGasLimit;
+        uint256 verificationGasLimit;
+        uint256 preVerificationGas;
+        uint256 maxFeePerGas;
+        uint256 maxPriorityFeePerGas;
+        bytes memory paymasterAndData;
+        bytes memory signature;
+
+        uint256 len = data.length;
+        bytes memory dataCopy = new bytes(len);
+        assembly {
+            calldatacopy(add(dataCopy, 0x20), 0, len) // Copy calldata to memory
+
+            sender := mload(add(dataCopy, 0x20))
+            nonce := mload(add(dataCopy, 0x40))
+            
+            let offset := add(dataCopy, mload(add(dataCopy, 0x60)))
+            initCode := add(offset, 0x20)
+            
+            offset := add(offset, mload(offset))
+            callData := add(offset, 0x20)
+            
+            offset := add(offset, mload(offset))
+            callGasLimit := mload(add(offset, 0x20))
+            verificationGasLimit := mload(add(offset, 0x40))
+            preVerificationGas := mload(add(offset, 0x60))
+            maxFeePerGas := mload(add(offset, 0x80))
+            maxPriorityFeePerGas := mload(add(offset, 0xA0))
+            
+            offset := add(offset, 0xC0)
+            paymasterAndData := add(offset, 0x20)
+            
+            offset := add(offset, mload(offset))
+            signature := add(offset, 0x20)
+        }
+
+        result.sender = sender;
+        result.nonce = nonce;
+        result.initCode = initCode;
+        result.callData = callData;
+        result.callGasLimit = callGasLimit;
+        result.verificationGasLimit = verificationGasLimit;
+        result.preVerificationGas = preVerificationGas;
+        result.maxFeePerGas = maxFeePerGas;
+        result.maxPriorityFeePerGas = maxPriorityFeePerGas;
+        result.paymasterAndData = paymasterAndData;
+        result.signature = signature;
+
+        return result;
+    }
+
+
+
     // extend lock by calling with value: 0
     function Deposit(address account) public payable locked {
         Escrow storage accountInfo_ = accountInfo[account];
@@ -80,25 +177,27 @@ contract TestEscrow is BasicMessageReceiver {
         if(!ccipAddress[msg.sender]) {
             revert InvalidCCIPAddress(msg.sender);
         }
-        UserOperation calldata userOp = UserOperation(message.data);
-        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
+        UserOperation calldata userOp = _calldataUserOperation(_decodeUserOperation(message.data));
+        PaymasterAndData memory data = _decodePaymasterAndData(userOp.paymasterAndData);
 
         // authenticate the operation
-        bytes32 memory userOpHash = userOp.hash();
+        bytes32 userOpHash = userOp.hash();
         // need to check safe signature method (maybe ecdsa?)
         // account == validateSignature from safe
 
         if(data.chainId != block.chainid) {
             revert InvalidChain(data.chainId);
         }
-        if(data.amount < balance(address(this))) {
-            revert BalanceError(data.amount, balance(address(this)));
+        if(data.amount < address(this).balance) {
+            revert BalanceError(data.amount, address(this).balance);
         }
 
-        if(data.amount <= accountInfo[data.account])
+        if(data.amount <= accountInfo[data.owner].balance) {
+            revert InsufficentFunds(userOp.sender, data.amount, accountInfo[data.owner].balance);
+        }
         (bool success,) = payable(data.target).call{value: data.amount}("");
         if(!success) {
-            PaymasterPaymentFailed(data.target, userOp.sender, data.amount);
+            revert PaymasterPaymentFailed(data.target, userOp.sender, data.amount);
         }
     }
 
@@ -109,33 +208,33 @@ contract TestEscrow is BasicMessageReceiver {
         if(!ccipAddress[msg.sender]) {
             revert InvalidCCIPAddress(msg.sender);
         }
-        UserOperation calldata userOp = UserOperation(message.data);
-        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
+        UserOperation calldata userOp = _calldataUserOperation(_decodeUserOperation(message.data));
+        PaymasterAndData memory data = _decodePaymasterAndData(userOp.paymasterAndData);
 
         // authenticate the operation
-        bytes32 memory userOpHash = userOp.hash();
+        bytes32 userOpHash = userOp.hash();
         // need to check safe signature method (maybe ecdsa?)
 
         if(data.chainId != block.chainid) {
             revert InvalidChain(data.chainId);
         }
-        if(data.amount < balance(address(this))) {
-            revert BalanceError(data.amount, balance(address(this)));
+        if(data.amount < address(this).balance) {
+            revert BalanceError(data.amount, address(this).balance);
         }
 
         emit PrintUserOp(userOp, data);
     }
-//Client.Any2EVMMessage memory message
-/*
-Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
-            data: abi.encode(messageText),
-            tokenAmounts: new Client.EVMTokenAmount[](0),
-            extraArgs: "",
-            feeToken: payFeesIn == PayFeesIn.LINK ? i_link : address(0)
-        });
+    
+    /*
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+                receiver: abi.encode(receiver),
+                data: abi.encode(messageText),
+                tokenAmounts: new Client.EVMTokenAmount[](0),
+                extraArgs: "",
+                feeToken: payFeesIn == PayFeesIn.LINK ? i_link : address(0)
+            });
 
-*/
+    */
     function CallPrintOp(Client.Any2EVMMessage memory message) payable external locked {
         // validate msg.sender is ccip source
         // cast data into userop
@@ -143,28 +242,29 @@ Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
         if(!ccipAddress[msg.sender]) {
             revert InvalidCCIPAddress(msg.sender);
         }
-        UserOperation calldata userOp = UserOperation(message.data);
-        bytes memory data = PaymasterAndData(userOp.paymasterAndData);
+        UserOperation calldata userOp = _calldataUserOperation(_decodeUserOperation(message.data));
+        PaymasterAndData memory data = _decodePaymasterAndData(userOp.paymasterAndData);
 
         // authenticate the operation
-        bytes32 memory userOpHash = userOp.hash();
+        bytes32 userOpHash = userOp.hash();
         // need to check safe signature method (maybe ecdsa?)
 
         if(data.chainId != block.chainid) {
             revert InvalidChain(data.chainId);
         }
-        if(data.amount < balance(address(this))) {
-            revert BalanceError(data.amount, balance(address(this)));
+        if(data.amount < address(this).balance) {
+            revert BalanceError(data.amount, address(this).balance);
         }
     }
 
     error WithdrawRejected(string);
     error TransferFailed();
+    error InsufficentFunds(address account, uint256 needed, uint256 available);
     error PaymasterPaymentFailed(address paymaster, address account, uint256 amount);
     error InvalidCCIPAddress(address badSender);
     error InvalidLayerZeroAddress(address badSender);
     error InvalidHyperlaneAddress(address badSender);
-    error InvalidChain(address badDestination);
+    error InvalidChain(uint64 badDestination);
     error BalanceError(uint256 requested, uint256 actual);
 
     event PrintUserOp(UserOperation userOp, PaymasterAndData paymasterAndData);

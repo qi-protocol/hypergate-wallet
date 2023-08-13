@@ -3,7 +3,7 @@ forge-std/=lib/forge-std/src/
 @solbase=lib/solbase/src/
 
 @erc4337=lib/account-abstraction/contracts
-@openzeppelin/=lib/oppenzeppelin-contracts/
+@openzeppelin/=lib/openzeppelin-contracts/
 @oppenzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts
 @safe/=lib/safe-core-sdk/packages/contracts/safe_V1_1_1
 

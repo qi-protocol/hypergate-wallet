@@ -5,8 +5,8 @@ pragma solidity ^0.8.17;
 /* solhint-disable no-inline-assembly */
 /* solhint-disable reason-string */
 
-import "./HypergateProxy.sol";
-import "./HypergateWallet.sol";
+import {HypergateProxy} from "./HypergateProxy.sol";
+import {HypergateWallet} from "./HypergateWallet.sol";
 import "lib/openzeppelin-contracts/contracts/utils/Create2.sol";
 
 /**
@@ -30,7 +30,7 @@ contract HypergateWalletFactory {
         return address(uint160(_WALLETIMPL));
     }
 
-    function _calcSalt(address owner, bytes memory _initializer, bytes32 _salt) private pure returns (bytes32 salt) {
+    function _calcSalt(bytes memory _initializer, bytes32 _salt) private pure returns (bytes32 salt) {
         salt = keccak256(abi.encodePacked(keccak256(_initializer), _salt));
     }
 
@@ -66,7 +66,7 @@ contract HypergateWalletFactory {
      * @notice  return the counterfactual address of soul wallet as it would be return by createWallet()
      */
     function getWalletAddress(bytes memory _initializer, bytes32 _salt) external view returns (address proxy) {
-        bytes memory deploymentData = abi.encodePacked(type(SoulWalletProxy).creationCode, _WALLETIMPL);
+        bytes memory deploymentData = abi.encodePacked(type(HypergateProxy).creationCode, _WALLETIMPL);
         bytes32 salt = _calcSalt(_initializer, _salt);
         proxy = Create2.computeAddress(salt, keccak256(deploymentData));
     }

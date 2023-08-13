@@ -6,22 +6,39 @@ import "forge-std/Test.sol";
 import "forge-std/StdCheats.sol";
 import "forge-std/console.sol";
 
-import {EntryPoint, IEntryPoint} from "lib/account-abstraction/core/EntryPoint.sol";
+import {EntryPoint, IEntryPoint, UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/core/EntryPoint.sol";
+import {Safe} from "lib/safe-contracts/contracts/Safe.sol";
+import {SafeProxyFactory} from "lib/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import {HypergateWalletFactory, HypergateWallet} from "contracts/HypergateWalletFactory.sol";
 //import {SimpleAccount, SimpleAccountFactory, UserOperation} from "@erc4337/samples/SimpleAccountFactory.sol";
-
+//bytes memory initHypergateWallet = abi.encodeWithSelector(0xc4d66de8,address_);
 contract basicTest is Test {
+    using UserOperationLib for UserOperation;
     address internal eoaAddress;
 
     // Entry point
     EntryPoint public entryPoint;
     address internal entryPointAddress;
 
-    // Factory for individual 4337 accounts
-    SimpleAccountFactory public simpleAccountFactory;
-    address internal simpleAccountFactoryAddress;
+    // // Factory for individual 4337 accounts
+    // SimpleAccountFactory public simpleAccountFactory;
+    // address internal simpleAccountFactoryAddress;
 
-    SimpleAccount public simpleAccount;
-    address internal simpleAccountAddress;
+    // Hypergate Wallet variables
+    HypergateWalletFactory public hypergateWalletFactory;
+    address internal hypergateWalletFactoryAddress;
+    HypergateWallet public hypergateWallet;
+    address internal hypergateWalletAddress;
+    HypergateWallet public hypergateWalletSingleton;
+    address internal hypergateWalletSingletonAddress;
+
+    // Safe Wallet variables
+    SafeProxyFactory public safeProxyFactory;
+    address internal safeProxyFactoryAddress;
+    Safe public safeSingleton;
+    address internal safeSingletonAddress;
+    Safe public safeWallet;
+    address internal safeWalletAddress;
 
     uint256 internal constant SALT = 0x55;
     
@@ -52,19 +69,25 @@ contract basicTest is Test {
         eoaAddress = vm.addr(privateKey);
         entryPoint = new EntryPoint();
         entryPointAddress = address(entryPoint);
-        simpleAccountFactory = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
-        simpleAccountFactoryAddress = address(simpleAccountFactory);
-        simpleAccount = simpleAccountFactory.createAccount(eoaAddress, SALT);
-        simpleAccountAddress = address(simpleAccount);
+
+        // 0xc4d66de8 == bytes4(keccak256("initialize(address)"))
+        bytes memory initHypergateWallet = abi.encodeWithSelector(0xc4d66de8,eoaAddress);
+
+        hypergateWalletSingleton = new HypergateWallet();
+        hypergateWalletSingletonAddress = address(hypergateWalletSingleton);
+        hypergateWalletFactory = new HypergateWalletFactory(hypergateWalletSingletonAddress);
+        hypergateWalletFactoryAddress = address(hypergateWalletFactory);
+        hypergateWalletAddress = hypergateWalletFactory.createWallet(initHypergateWallet, bytes32(SALT));
+        hypergateWallet = HypergateWallet(payable(hypergateWalletAddress));
     }
 
     function testCreate() public {
-        console.log("All local EVM:");
-        console.log("EOA: ", eoaAddress);
-        console.log("EntryPoint: ", entryPointAddress);
-        console.log("Simple Factory: ", simpleAccountFactoryAddress);
-        console.log("SALT: ", SALT);
-        console.log("Simple Account: ", simpleAccountAddress);
+        // console.log("All local EVM:");
+        // console.log("EOA: ", eoaAddress);
+        // console.log("EntryPoint: ", entryPointAddress);
+        // console.log("Simple Factory: ", simpleAccountFactoryAddress);
+        // console.log("SALT: ", SALT);
+        // console.log("Simple Account: ", simpleAccountAddress);
     }
 }
 
