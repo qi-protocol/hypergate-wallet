@@ -56,12 +56,6 @@ TODO
 
 
 
-
-forge script script/deploy.s.sol:Deploy --broadcast --rpc-url https://still-orbital-theorem.base-goerli.quiknode.pro/7778efb6a98a8757645ed9ead407fd614d3964b9/
-
-
-
-
 ### Wallet Details
 
 | Wallet      | Code       |
