@@ -1,5 +1,5 @@
 {
-  "name": "eth-superhack",
+  "name": "eth-navh",
   "scripts": {
     "build": "forge build --sizes",
     "test": "forge test -vvv",
