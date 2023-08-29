@@ -408,7 +408,7 @@ contract TestEscrow is Ownable {
     /// @dev This function adds funds of amount_ of an asset_, then calls
     ///      _deposit to commit the added funds.
     function deposit(address account_, address asset_, uint256 amount_) public payable locked {
-        if(asset != address(0)) {
+        if(asset_ != address(0)) {
             require(msg.value == 0, "non-payable when using tokens");
             bytes memory payload_ = abi.encodeWithSignature(
                 "transferFrom(address,address,uint256)", 
@@ -417,7 +417,7 @@ contract TestEscrow is Ownable {
                 amount_
             );
             assembly {
-                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload), 0,0,0))
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0,0))
             }
         }
 
@@ -433,11 +433,11 @@ contract TestEscrow is Ownable {
         bytes memory payload_ = abi.encodePacked(selector_, account_);
         uint256 escrowBalance_ = _escrowBalance[asset_];
         uint256 delta;
-        if(asset == address(0)) {
+        if(asset_ == address(0)) {
             delta = address(this).balance - escrowBalance_;
         } else {
             assembly {
-                pop(call(gas(), asset_, 0, add(payload_, 0x20), 0,0,0))
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0, 0x20))
                 returndatacopy(0, 0, 0x20)
                 delta := sub(mload(0), escrowBalance_)
             }
@@ -447,48 +447,52 @@ contract TestEscrow is Ownable {
             revert InvalidDeltaValue();
         }
 
-        _accountInfo.assetBalance[asset_] = accountInfo_.assetBalance[asset_] + delta;
+        _accountInfo[account_].assetBalance[asset_] = _accountInfo[account_].assetBalance[asset_] + delta;
     }
 
     function extendLock(address account_, uint256 seconds_, bytes memory signature_) public {
-        accountInfo_.deadline = block.timestamp + 1200;
         bytes32 hash_ = _hashSeconds(account_, seconds_);
         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_, signature_);
         if (error != ECDSA.RecoverError.NoError) {
             revert BadSignature();
         } else {
-            if(recovered != paymasterAndData.owner) {
+            if(recovered != account_) {
                 revert InvalidSignature(account_, recovered);
             }
         } 
     }
 
-    function _hashSeconds(address account_, uint256 seconds_, bytes32 hash_) internal returns(bytes32) {
-        return keccak256(abi.encode(account_, seconds_, hash_));
+    function _hashSeconds(address account_, uint256 seconds_) internal returns(bytes32) {
+        return keccak256(abi.encode(account_, seconds_));
     }
 
-    function withdraw(address account, address asset, uint256 amount_) public locked {
-        Escrow storage accountInfo_ = _accountInfo[account];
+    function withdraw(address account_, address asset_, uint256 amount_) public locked {
+        Escrow storage accountInfo_ = _accountInfo[account_];
         if(accountInfo_.deadline > block.timestamp) {
             revert WithdrawRejected("Too early");
         }
-        if(accountInfo_.assetBalance[asset] < amount_) {
-            revert WithdrawRejected("Insufficent balance");
-        }
+
         bool success;
-        if(asset == address(0)) {
-            (success,) = payable(account).call{value: amount_}("");
+        if(asset_ == address(0)) {
+            (success,) = payable(account_).call{value: amount_}("");
         } else {
-            require(msg.value == 0, "non-payable when using tokens");
-            bytes memory payload_ = abi.encodeWithSignature("transferFrom(address,address,uint256)", address(this), msg.sender, amount_);
-            (success,) = asset.call(payload_);
-            require(success, "");
-            accountInfo_.assetBalance[asset] = accountInfo_.assetBalance[asset] + msg.value;
+            bytes memory payload_ = abi.encodeWithSignature("transferFrom(address,address,uint256)", address(this), account_, amount_);
+            assembly {
+                success := call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0,0)
+            }
+            
         }
-        (success,) = payable(account).call{value: amount_}("");
+
         if(!success) {
             revert TransferFailed();
         }
+
+        if(accountInfo_.assetBalance[asset_] < amount_) {
+            revert WithdrawRejected("Insufficent balance");
+        }
+
+        accountInfo_.assetBalance[asset_] = accountInfo_.assetBalance[asset_] - amount_;
+
     }
 
     function handleMessage(Client.Any2EVMMessage memory message) payable external locked {
