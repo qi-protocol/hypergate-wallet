@@ -16,6 +16,8 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 // transfer amount to paymaster 
 contract TestPaymaster is BasePaymaster {
     mapping(uint64 => address) paymasterAddress;
+    mapping(uint64 => bool) acceptedChain;
+    mapping(address => bool) acceptedOrigin;
     
     bytes4 _selector;
     address ccip_router;
@@ -37,6 +39,7 @@ contract TestPaymaster is BasePaymaster {
         ccip_router = ccip_router_;
     }
 
+    // selector: 0xb63e800d
     function send(
         uint64 destinationChainSelector,
         address receiver,
@@ -65,6 +68,7 @@ contract TestPaymaster is BasePaymaster {
     internal
     override
     returns (bytes memory context, uint256 validationResult) {unchecked {
+        if(!acceptedOrigin[tx.origin]) { revert RejectedOrigin(tx.origin); }
         // send with hash and signature
         bytes calldata data = userOp.paymasterAndData;
         uint256 paymasterAndDataLength = data.length;
@@ -80,7 +84,11 @@ contract TestPaymaster is BasePaymaster {
         address owner_ = address(bytes20(data[48:68]));
         uint256 amount_ = uint256(bytes32(data[68:100]));
 
-        this.send{value: amount_}(chainId_, target_, abi.encode(userOp));
+        // If paymaster doesn't have a default account on the 
+        if(!acceptedChain[chainId_]) { revert RejectedChainId(chainId_); }
+        address receiver = paymasterAddress[chainId_] != address(0) ? paymasterAddress[chainId_] : address(this);
+
+        this.send{value: amount_}(chainId_, target_, abi.encode(userOp, receiver));
     }}
 
     function withdraw(address target) public onlyOwner() {
@@ -88,4 +96,7 @@ contract TestPaymaster is BasePaymaster {
     }
 
     fallback() external payable {}
+
+    error RejectedChainId(uint64 chainId);
+    error RejectedOrigin(address bundler);
 }

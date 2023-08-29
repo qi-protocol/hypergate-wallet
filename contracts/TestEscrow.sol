@@ -6,6 +6,7 @@ import {Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 // needs to recieve a message from ccip (UserOp, PaymasterAddress)
 // then release locked funds
@@ -16,18 +17,20 @@ import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 contract TestEscrow is Ownable {
     using UserOperationLib for UserOperation;
     using Strings for uint256;
+    using ECDSA for bytes32;
 
-    mapping(address => Escrow) accountInfo;
+    mapping(address => Escrow) _accountInfo;
     mapping(address => bool) entryPoint;
     mapping(address => bool) ccipAddress;
     mapping(address => bool) layerZeroAddress;
     mapping(address => bool) hyperlaneAddress;
+    mapping(address => uint256) _escrowBalance;
 
     struct Escrow {
         uint256 deadline;
         uint256 nonce;
-        uint256 balance;
         mapping(uint256 => Payment) history;
+        mapping(address => uint256) assetBalance;
     }
 
     struct Payment {
@@ -35,13 +38,14 @@ contract TestEscrow is Ownable {
         uint256 assetAmount;
         uint256 id;
         uint256 chainId;
+        address asset;
         address to;
     }
 
     struct PaymasterAndData {
         address paymaster;
         uint64 chainId;
-        address target;
+        address asset;
         address owner;
         uint256 amount;
     }
@@ -58,41 +62,35 @@ contract TestEscrow is Ownable {
         ccipAddress[ccip] = state;
     }
 
-    function _decodePaymasterAndData(bytes memory data) internal returns (PaymasterAndData memory) {
-        require(data.length >= 160, (data.length).toString());
+    function pack(UserOperation memory userOp) internal pure returns (bytes memory ret) {
+        address sender = userOp.sender;
+        uint256 nonce = userOp.nonce;
+        bytes32 hashInitCode = keccak256(userOp.initCode);
+        bytes32 hashCallData = keccak256(userOp.callData);
+        uint256 callGasLimit = userOp.callGasLimit;
+        uint256 verificationGasLimit = userOp.verificationGasLimit;
+        uint256 preVerificationGas = userOp.preVerificationGas;
+        uint256 maxFeePerGas = userOp.maxFeePerGas;
+        uint256 maxPriorityFeePerGas = userOp.maxPriorityFeePerGas;
+        bytes32 hashPaymasterAndData = keccak256(userOp.paymasterAndData);
 
-        bytes32[5] memory op_data;
-
-        uint256 len = data.length;
-        bytes memory dataCopy = new bytes(len);
-        assembly {
-            calldatacopy(add(dataCopy, 0x20), 0, len) // Copy calldata to memory
-
-            mstore(add(op_data, 0x20), mload(add(dataCopy, 0x20))) // paymaster
-            mstore(add(op_data, 0x40), mload(add(dataCopy, 0x40))) // chainId
-            mstore(add(op_data, 0x60), mload(add(dataCopy, 0x60))) // target
-            mstore(add(op_data, 0x80), mload(add(dataCopy, 0x80))) // owner
-            mstore(add(op_data, 0xA0), mload(add(dataCopy, 0xA0))) // amount
-        }
-
-        return PaymasterAndData(
-            address(uint160(uint256(op_data[0]))),
-            uint64(uint256(op_data[1])),
-            address(uint160(uint256(op_data[2]))),
-            address(uint160(uint256(op_data[3]))),
-            uint256(op_data[4])
+        return abi.encode(
+            sender, nonce,
+            hashInitCode, hashCallData,
+            callGasLimit, verificationGasLimit, preVerificationGas,
+            maxFeePerGas, maxPriorityFeePerGas,
+            hashPaymasterAndData
         );
     }
 
-
-    function _calldataUserOperation(UserOperation memory userop) internal view returns(UserOperation calldata op) {
-        assembly {
-            op := userop
-        }
+    function hash(UserOperation memory userOp) internal pure returns (bytes32) {
+        return keccak256(pack(userOp));
     }
 
-    // deserialize userop calldata for easier integration into any dapp
-    function _decodeUserOperation(bytes calldata data) public returns (UserOperation memory) {
+    /** @dev Deserializs userop calldata for easier integration into any dapp
+      *      Warning: this function is low-level manipulation
+      */
+    function _decodeUserOperation() public returns (UserOperation memory) {
         bytes32 messageId;
         uint256 sourceChainSelector;
         bytes memory sender;
@@ -108,10 +106,9 @@ contract TestEscrow is Ownable {
         uint256 uoMaxPriorityFeePerGas;
         bytes memory uoPaymasterAndData;
         bytes memory uoSignature;
+        uint256 dummy;
         Client.EVMTokenAmount memory destTokenAmounts;
         assembly {
-            let dataLength
-            let objectLength
             let len := mload(0x20)
             let ptr := mload(0x40)
             let offset := 0x4
@@ -175,6 +172,7 @@ contract TestEscrow is Ownable {
             calldatacopy(len, add(uoCallData, add(offset, 0x20)), 0x20)
             switch iszero(len)
             case 0 {
+                //calldatacopy(ptr, add(uoCallData, add(offset, 0x20)), mload(add(len, 0x20)))
                 calldatacopy(ptr, add(uoCallData, add(offset, 0x40)), mload(len))
                 uoCallData := mload(ptr)
             }
@@ -182,8 +180,13 @@ contract TestEscrow is Ownable {
             calldatacopy(len, add(uoPaymasterAndData, add(offset, 0x20)), 0x20)
             switch iszero(len)
             case 0 {
-                calldatacopy(ptr, add(uoPaymasterAndData, add(offset, 0x40)), mload(len))
+                calldatacopy(ptr, add(uoPaymasterAndData, add(offset, 0x20)), add(mload(len), 0x20))
+                //calldatacopy(ptr, add(uoPaymasterAndData, add(offset, 0x40)), mload(len))
                 uoPaymasterAndData := mload(ptr)
+                dummy := mload(ptr)
+                dummy := mload(add(ptr, 0x20)) // correct
+                mstore(ptr, uoPaymasterAndData)
+                dummy := mload(add(ptr, 0x40)) // gave 288
             }
             // ----------------------------------------------------------------
             calldatacopy(len, add(uoSignature, add(offset, 0x20)), 0x20)
@@ -294,6 +297,7 @@ contract TestEscrow is Ownable {
             // destTokenAmounts
             // 0000000000000000000000000000000000000000000000000000000000000000
         }
+        //revert((dummy).toString());
 
         return UserOperation(
             uoSender,
@@ -310,24 +314,178 @@ contract TestEscrow is Ownable {
         );
     }
 
+    function _decodeUserOperation(bytes memory data) public returns (UserOperation memory) {
+        address uoSender;
+        uint256 uoNonce;
+        bytes memory uoInitCode;
+        bytes memory uoCallData;
+        uint256 uoCallGasLimit;
+        uint256 uoVerificationGasLimit;
+        uint256 uoPreVerificationGas;
+        uint256 uoMaxFeePerGas;
+        uint256 uoMaxPriorityFeePerGas;
+        bytes memory uoPaymasterAndData;
+        bytes memory uoSignature;
 
+        assembly {
+            let len := mload(0x20)
+            let ptr := mload(0x40)
+            let offset := 0x4
 
-    // extend lock by calling with value: 0
-    function deposit(address account) public payable locked {
-        Escrow storage accountInfo_ = accountInfo[account];
-        accountInfo_.deadline = block.timestamp + 1200;
-        accountInfo_.balance = accountInfo_.balance + msg.value;
+            calldatacopy(ptr, offset, 0x20)
+            calldatacopy(ptr, add(mload(ptr), offset), 0x20)
+            uoSender := mload(ptr)
+            // ----------------------------------------------------------------
+            calldatacopy(ptr, add(offset, 0x40), 0x20)
+            uoNonce := mload(ptr)
+            // ----------------------------------------------------------------
+            calldatacopy(ptr, add(offset, 0x60), 0x20)
+            uoInitCode := mload(ptr) // ref
+            calldatacopy(ptr, add(offset, 0x80), 0x20)
+            uoCallData := mload(ptr) // ref
+            // ----------------------------------------------------------------
+            calldatacopy(ptr, add(offset, 0xA0), 0x20)
+            uoCallGasLimit := mload(ptr)
+            calldatacopy(ptr, add(offset, 0xC0), 0x20)
+            uoVerificationGasLimit := mload(ptr)
+            calldatacopy(ptr, add(offset, 0xE0), 0x20)
+            uoPreVerificationGas := mload(ptr)
+            calldatacopy(ptr, add(offset, 0x100), 0x20)
+            uoMaxFeePerGas := mload(ptr)
+            calldatacopy(ptr, add(offset, 0x120), 0x20)
+            uoMaxPriorityFeePerGas := mload(ptr)
+            // ----------------------------------------------------------------
+            calldatacopy(ptr, add(offset, 0x140), 0x20)
+            uoPaymasterAndData := mload(ptr) // ref
+            calldatacopy(ptr, add(offset, 0x160), 0x20)
+            uoSignature := mload(ptr) // ref
+            // ----------------------------------------------------------------
+            calldatacopy(len, add(uoInitCode, add(offset, 0x20)), 0x20)
+            switch iszero(len)
+            case 0 {
+                calldatacopy(ptr, add(uoInitCode, add(offset, 0x40)), mload(len))
+                uoInitCode := mload(ptr)
+            }
+            // ----------------------------------------------------------------
+            calldatacopy(len, add(uoCallData, add(offset, 0x20)), 0x20)
+            switch iszero(len)
+            case 0 {
+                calldatacopy(ptr, add(uoCallData, add(offset, 0x40)), mload(len))
+                uoCallData := mload(ptr)
+            }
+            // ----------------------------------------------------------------
+            calldatacopy(len, add(uoPaymasterAndData, add(offset, 0x20)), 0x20)
+            switch iszero(len)
+            case 0 {
+                calldatacopy(ptr, add(uoPaymasterAndData, add(offset, 0x40)), mload(len))
+                uoPaymasterAndData := mload(ptr)
+            }
+            // ----------------------------------------------------------------
+            calldatacopy(len, add(uoSignature, add(offset, 0x20)), 0x20)
+            switch iszero(len)
+            case 0 {
+                calldatacopy(ptr, add(uoSignature, add(offset, 0x40)), mload(len))
+                uoSignature := mload(ptr)
+            }
+        }
+
+        return UserOperation(
+            uoSender,
+            uint256(uoNonce),
+            uoInitCode,
+            uoCallData,
+            uint256(uoCallGasLimit),
+            uint256(uoVerificationGasLimit),
+            uint256(uoPreVerificationGas),
+            uint256(uoMaxFeePerGas),
+            uint256(uoMaxPriorityFeePerGas),
+            uoPaymasterAndData,
+            uoSignature
+        );
     }
 
-    function withdraw(address account, uint256 amount) public locked {
-        Escrow storage accountInfo_ = accountInfo[account];
+    // extend lock by calling with value: 0, 0, 0
+    /// @dev This function adds funds of amount_ of an asset_, then calls
+    ///      _deposit to commit the added funds.
+    function deposit(address account_, address asset_, uint256 amount_) public payable locked {
+        if(asset != address(0)) {
+            require(msg.value == 0, "non-payable when using tokens");
+            bytes memory payload_ = abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)", 
+                msg.sender, 
+                address(this), 
+                amount_
+            );
+            assembly {
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload), 0,0,0))
+            }
+        }
+
+        _deposit(account_, asset_);
+        // need to increment time deposit is locked
+    }
+    
+    /// @dev This function traces the delta of unaccounted changes to the
+    ///      escrow balances and then adds that difference to the balance of 
+    ///      the owner account.
+    function _deposit(address account_, address asset_) internal {
+        bytes4 selector_ = bytes4(keccak256("balanceOf(address)"));
+        bytes memory payload_ = abi.encodePacked(selector_, account_);
+        uint256 escrowBalance_ = _escrowBalance[asset_];
+        uint256 delta;
+        if(asset == address(0)) {
+            delta = address(this).balance - escrowBalance_;
+        } else {
+            assembly {
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), 0,0,0))
+                returndatacopy(0, 0, 0x20)
+                delta := sub(mload(0), escrowBalance_)
+            }
+        }
+
+        if(delta == 0) {
+            revert InvalidDeltaValue();
+        }
+
+        _accountInfo.assetBalance[asset_] = accountInfo_.assetBalance[asset_] + delta;
+    }
+
+    function extendLock(address account_, uint256 seconds_, bytes memory signature_) public {
+        accountInfo_.deadline = block.timestamp + 1200;
+        bytes32 hash_ = _hashSeconds(account_, seconds_);
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_, signature_);
+        if (error != ECDSA.RecoverError.NoError) {
+            revert BadSignature();
+        } else {
+            if(recovered != paymasterAndData.owner) {
+                revert InvalidSignature(account_, recovered);
+            }
+        } 
+    }
+
+    function _hashSeconds(address account_, uint256 seconds_, bytes32 hash_) internal returns(bytes32) {
+        return keccak256(abi.encode(account_, seconds_, hash_));
+    }
+
+    function withdraw(address account, address asset, uint256 amount_) public locked {
+        Escrow storage accountInfo_ = _accountInfo[account];
         if(accountInfo_.deadline > block.timestamp) {
             revert WithdrawRejected("Too early");
         }
-        if(accountInfo_.balance < amount) {
+        if(accountInfo_.assetBalance[asset] < amount_) {
             revert WithdrawRejected("Insufficent balance");
         }
-        (bool success,) = payable(account).call{value: amount}("");
+        bool success;
+        if(asset == address(0)) {
+            (success,) = payable(account).call{value: amount_}("");
+        } else {
+            require(msg.value == 0, "non-payable when using tokens");
+            bytes memory payload_ = abi.encodeWithSignature("transferFrom(address,address,uint256)", address(this), msg.sender, amount_);
+            (success,) = asset.call(payload_);
+            require(success, "");
+            accountInfo_.assetBalance[asset] = accountInfo_.assetBalance[asset] + msg.value;
+        }
+        (success,) = payable(account).call{value: amount_}("");
         if(!success) {
             revert TransferFailed();
         }
@@ -355,8 +513,8 @@ contract TestEscrow is Ownable {
         //     revert BalanceError(data.amount, address(this).balance);
         // }
 
-        // if(data.amount <= accountInfo[data.owner].balance) {
-        //     revert InsufficentFunds(userOp.sender, data.amount, accountInfo[data.owner].balance);
+        // if(data.amount <= _accountInfo[data.owner].balance) {
+        //     revert InsufficentFunds(userOp.sender, data.amount, _accountInfo[data.owner].balance);
         // }
         // (bool success,) = payable(data.target).call{value: data.amount}("");
         // if(!success) {
@@ -381,24 +539,93 @@ contract TestEscrow is Ownable {
         if(!ccipAddress[msg.sender]) {
             revert InvalidCCIPAddress(msg.sender);
         }
-        // need to check for authorized paymaster?
-        UserOperation memory mUserOp = _decodeUserOperation();
 
-        // UserOperation calldata userOp = _calldataUserOperation(mUserOp);
-        // PaymasterAndData memory data = _decodePaymasterAndData(mUserOp.paymasterAndData);
+        (UserOperation memory mUserOp, address receiver_) = abi.decode(message.data, (UserOperation, address));
+        PaymasterAndData memory paymasterAndData = abi.decode(mUserOp.paymasterAndData, (PaymasterAndData));
 
-        // // authenticate the operation
-        // bytes32 userOpHash = userOp.hash();
-        // // need to check safe signature method (maybe ecdsa?)
+        // validate signature & owner
+        bytes32 userOpHash = hash(mUserOp);
+        revert((uint256(userOpHash)).toString());
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(userOpHash, mUserOp.signature);
+        if (error != ECDSA.RecoverError.NoError) {
+            revert BadSignature();
+        } else {
+            if(recovered != paymasterAndData.owner) {
+                revert InvalidSignature(paymasterAndData.owner, recovered);
+            }
+        }
 
-        // if(data.chainId != block.chainid) {
-        //     revert InvalidChain(data.chainId);
+        if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
+        if(paymasterAndData.chainId != block.chainid) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.owner != address(0)) { revert InvalidOwner(paymasterAndData.owner); }
+        if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
+
+        // struct Escrow {
+        // uint256 deadline;
+        // uint256 nonce;
+        // uint256 balance;
+        // mapping(uint256 => Payment) history;
         // }
-        // if(data.amount < address(this).balance) {
-        //     revert BalanceError(data.amount, address(this).balance);
+
+        // struct Payment {
+        // uint256 timestamp;
+        // uint256 assetAmount;
+        // uint256 id;
+        // uint256 chainId;
+        // address asset;
+        // address to;
         // }
 
-        // emit PrintUserOp(userOp, data);
+        //
+        Escrow storage accountInfo_ = _accountInfo[paymasterAndData.owner];
+        if(block.timestamp > accountInfo_.deadline) { revert(""); }
+        // get nonce for payment listing _accountInfo.nonce
+
+        // Transfer amount of asset to receiver
+        bool success_;
+        address asset_ = paymasterAndData.asset;
+        if(asset_ == address(0)) { // address(0) == ETH
+            if(accountInfo_.assetBalance[asset_] >= paymasterAndData.amount) { revert(""); }
+            // insufficent address(this) balance will auto-revert
+            (success_,) = payable(receiver_).call{value: paymasterAndData.amount}("");
+        } else {
+            if(accountInfo_.assetBalance[asset_] >= paymasterAndData.amount) { 
+                revert InsufficentFunds(paymasterAndData.owner, asset_, paymasterAndData.amount);
+            }
+            // insufficent address(this) balance will auto-revert
+            bytes memory payload_ = abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)", 
+                address(this), 
+                receiver_, 
+                paymasterAndData.amount
+            );
+            assembly {
+                success_ := call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0, 0)
+            }
+        }
+        if(!success_) { 
+            revert PaymasterPaymentFailed(
+                receiver_, 
+                asset_, 
+                paymasterAndData.owner, 
+                paymasterAndData.amount
+            );
+        }
+        accountInfo_.history[accountInfo_.nonce] = Payment(
+            block.timestamp,
+            paymasterAndData.amount,
+            uint256(message.messageId),
+            paymasterAndData.chainId,
+            asset_,
+            receiver_
+        );
+        accountInfo_.nonce++;
+        //revert((uint256(paymasterAndData.amount)).toString());
+        if(paymasterAndData.amount < address(this).balance) {
+            revert BalanceError(paymasterAndData.amount, address(this).balance);
+        }
+
+        emit PrintUserOp(mUserOp, paymasterAndData);
     }
     
     /*
@@ -435,12 +662,17 @@ contract TestEscrow is Ownable {
 
     error WithdrawRejected(string);
     error TransferFailed();
-    error InsufficentFunds(address account, uint256 needed, uint256 available);
-    error PaymasterPaymentFailed(address paymaster, address account, uint256 amount);
+    error InsufficentFunds(address account, address asset, uint256 amount);
+    error PaymasterPaymentFailed(address receiver, address asset, address account, uint256 amount);
     error InvalidCCIPAddress(address badSender);
     error InvalidLayerZeroAddress(address badSender);
     error InvalidHyperlaneAddress(address badSender);
     error InvalidChain(uint64 badDestination);
+    error InvalidOwner(address owner);
+    error InvalidPaymaster(address paymaster);
+    error InvalidSignature(address owner, address notOwner);
+    error InvalidDeltaValue();
+    error BadSignature();
     error BalanceError(uint256 requested, uint256 actual);
 
     event PrintUserOp(UserOperation userOp, PaymasterAndData paymasterAndData);

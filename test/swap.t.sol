@@ -9,7 +9,9 @@ import {UniswapV2Factory} from "contracts/UniswapV2/UniswapV2Factory.sol";
 import {UniswapV2Pair} from "contracts/UniswapV2/UniswapV2Pair.sol";
 import {UniswapV2Router02} from "contracts/UniswapV2/UniswapV2Router.sol";
 
-contract swap is Test {
+import {CreateWalletTest} from "./createWallet.t.sol";
+
+contract SwapTest is CreateWalletTest {
     ERC20 public token;
     WETH9 public weth;
     UniswapV2Factory public uniswapV2Factory;
@@ -18,7 +20,9 @@ contract swap is Test {
     address owner;
     address[2] path;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+        owner = address(bytes20(keccak256(abi.encode("dummy address"))));
         token = new ERC20("TestToken", "TEST");
         weth = new WETH9();
         uniswapV2Factory = new UniswapV2Factory(owner);

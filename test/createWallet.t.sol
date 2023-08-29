@@ -14,6 +14,7 @@ import {HypergateWalletFactory, HypergateWallet} from "contracts/HypergateWallet
 //bytes memory initHypergateWallet = abi.encodeWithSelector(0xc4d66de8,address_);
 contract CreateWalletTest is Test {
     using UserOperationLib for UserOperation;
+
     address internal eoaAddress;
 
     // Entry point
@@ -65,7 +66,7 @@ contract CreateWalletTest is Test {
         signature: new bytes(0)
     });
 
-    function setUp() public {
+    function setUp() public virtual {
         string memory key = vm.readFile(".secret");
         bytes32 key_bytes = vm.parseBytes32(key);
         uint256 privateKey;
@@ -94,7 +95,7 @@ contract CreateWalletTest is Test {
 //function createProxyWithNonce(address _mastercopy, bytes memory initializer, uint256 saltNonce)
         safeInitalizer = abi.encodeWithSelector(0xb63e800d, 
             [eoaAddress],
-            0,
+            1,
             address(0),
             0,
             address(0),
