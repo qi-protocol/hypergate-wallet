@@ -20,7 +20,7 @@ contract TestEscrow is Ownable {
     using ECDSA for bytes32;
 
     mapping(address => Escrow) _accountInfo;
-    mapping(address => bool) entryPoint;
+    mapping(uint64 => address) _entryPoint;
     mapping(address => bool) ccipAddress;
     mapping(address => bool) layerZeroAddress;
     mapping(address => bool) hyperlaneAddress;
@@ -58,21 +58,29 @@ contract TestEscrow is Ownable {
         lock = false;
     }
 
+    function getBalance(address account_, address asset_) public returns(uint256) {
+        return _accountInfo[account_].assetBalance[asset_];
+    }
+
+    function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
+        _entryPoint[chainId_] = entryPoint_;
+    }
+
     function addCCIPAddress(address ccip, bool state) public onlyOwner {
         ccipAddress[ccip] = state;
     }
 
-    function pack(UserOperation memory userOp) internal pure returns (bytes memory ret) {
-        address sender = userOp.sender;
+    function pack(UserOperation calldata userOp) internal pure returns (bytes memory ret) {
+        address sender = getSender(userOp);
         uint256 nonce = userOp.nonce;
-        bytes32 hashInitCode = keccak256(userOp.initCode);
-        bytes32 hashCallData = keccak256(userOp.callData);
+        bytes32 hashInitCode = calldataKeccak(userOp.initCode);
+        bytes32 hashCallData = calldataKeccak(userOp.callData);
         uint256 callGasLimit = userOp.callGasLimit;
         uint256 verificationGasLimit = userOp.verificationGasLimit;
         uint256 preVerificationGas = userOp.preVerificationGas;
         uint256 maxFeePerGas = userOp.maxFeePerGas;
         uint256 maxPriorityFeePerGas = userOp.maxPriorityFeePerGas;
-        bytes32 hashPaymasterAndData = keccak256(userOp.paymasterAndData);
+        bytes32 hashPaymasterAndData = calldataKeccak(userOp.paymasterAndData);
 
         return abi.encode(
             sender, nonce,
@@ -83,8 +91,24 @@ contract TestEscrow is Ownable {
         );
     }
 
-    function hash(UserOperation memory userOp) internal pure returns (bytes32) {
+    function hash(UserOperation calldata userOp) public pure returns (bytes32) {
         return keccak256(pack(userOp));
+    }
+
+    function calldataKeccak(bytes calldata data) public pure returns (bytes32 ret) {
+        assembly {
+            let mem := mload(0x40)
+            let len := data.length
+            calldatacopy(mem, data.offset, len)
+            ret := keccak256(mem, len)
+        }
+    }
+
+    function getSender(UserOperation calldata userOp) internal pure returns (address) {
+        address data;
+        //read sender from userOp, which is first userOp member (saves 800 gas...)
+        assembly {data := calldataload(userOp)}
+        return address(uint160(data));
     }
 
     /** @dev Deserializs userop calldata for easier integration into any dapp
@@ -404,6 +428,18 @@ contract TestEscrow is Ownable {
         );
     }
 
+    /// @dev Deposit and lock in a single contract call
+    function depositAndLock(
+        address account_, 
+        address asset_, 
+        uint256 amount_, 
+        uint256 seconds_, 
+        bytes memory signature_
+    ) public {
+        deposit(account_, asset_, amount_);
+        extendLock(account_, seconds_, signature_);
+    }
+
     // extend lock by calling with value: 0, 0, 0
     /// @dev This function adds funds of amount_ of an asset_, then calls
     ///      _deposit to commit the added funds.
@@ -450,19 +486,27 @@ contract TestEscrow is Ownable {
         _accountInfo[account_].assetBalance[asset_] = _accountInfo[account_].assetBalance[asset_] + delta;
     }
 
+    /// @dev The ability to increment lock time must be exclusive to the account owner.
+    ///      This is crypographically secured.
     function extendLock(address account_, uint256 seconds_, bytes memory signature_) public {
+        if(account_ == address(0)) {
+            InvalidOwner(account_);
+        }
+
         bytes32 hash_ = _hashSeconds(account_, seconds_);
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_, signature_);
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_.toEthSignedMessageHash(), signature_);
         if (error != ECDSA.RecoverError.NoError) {
             revert BadSignature();
-        } else {
-            if(recovered != account_) {
-                revert InvalidSignature(account_, recovered);
-            }
-        } 
+        }
+
+        if(recovered != account_) {
+            revert InvalidSignature(account_, recovered);
+        }
+
+        _accountInfo[account_].deadline = _accountInfo[account_].deadline + seconds_;
     }
 
-    function _hashSeconds(address account_, uint256 seconds_) internal returns(bytes32) {
+    function _hashSeconds(address account_, uint256 seconds_) public returns(bytes32) {
         return keccak256(abi.encode(account_, seconds_));
     }
 
@@ -544,13 +588,25 @@ contract TestEscrow is Ownable {
             revert InvalidCCIPAddress(msg.sender);
         }
 
+        // deserialize userop and paymasterAndData
         (UserOperation memory mUserOp, address receiver_) = abi.decode(message.data, (UserOperation, address));
         PaymasterAndData memory paymasterAndData = abi.decode(mUserOp.paymasterAndData, (PaymasterAndData));
 
-        // validate signature & owner
-        bytes32 userOpHash = hash(mUserOp);
-        revert((uint256(userOpHash)).toString());
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(userOpHash, mUserOp.signature);
+        // hash userop locally
+        bytes memory payload_ = abi.encodeWithSelector(bytes4(0x7b1d0da3), mUserOp);
+        bytes32 userOpHash;
+        assembly {
+            pop(call(gas(), address(), 0, add(payload_, 0x20), mload(payload_), 0, 0x20))
+            userOpHash := mload(0)
+        }
+        userOpHash = keccak256(abi.encode(
+            userOpHash, 
+            _entryPoint[paymasterAndData.chainId], 
+            uint256(paymasterAndData.chainId)
+        ));
+        
+        // validate signature
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(userOpHash.toEthSignedMessageHash(), mUserOp.signature);
         if (error != ECDSA.RecoverError.NoError) {
             revert BadSignature();
         } else {
@@ -558,29 +614,16 @@ contract TestEscrow is Ownable {
                 revert InvalidSignature(paymasterAndData.owner, recovered);
             }
         }
+        //revert((uint256(uint160(paymasterAndData.owner))).toString());
 
         if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
-        if(paymasterAndData.chainId != block.chainid) { revert InvalidChain(paymasterAndData.chainId); }
-        if(paymasterAndData.owner != address(0)) { revert InvalidOwner(paymasterAndData.owner); }
+        if(paymasterAndData.chainId == uint64(0)) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
         if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
 
-        // struct Escrow {
-        // uint256 deadline;
-        // uint256 nonce;
-        // uint256 balance;
-        // mapping(uint256 => Payment) history;
-        // }
+        revert(uint256(uint160(paymasterAndData.owner)).toString());
+        revert(uint256(_accountInfo[paymasterAndData.owner].assetBalance[paymasterAndData.asset]).toString());
 
-        // struct Payment {
-        // uint256 timestamp;
-        // uint256 assetAmount;
-        // uint256 id;
-        // uint256 chainId;
-        // address asset;
-        // address to;
-        // }
-
-        //
         Escrow storage accountInfo_ = _accountInfo[paymasterAndData.owner];
         if(block.timestamp > accountInfo_.deadline) { revert(""); }
         // get nonce for payment listing _accountInfo.nonce

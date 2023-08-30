@@ -60,6 +60,7 @@ contract PrintMessageTest is CreateWalletTest {
         super.setUp();
         testEscrow = new TestEscrow();
         testEscrowAddress = address(testEscrow);
+        testEscrow.addEntryPoint(entryPointAddress, uint64(block.chainid));
         testPaymaster = new TestPaymaster(IEntryPoint(entryPointAddress), address(0));
         testPaymasterAddress = address(testPaymaster);
         testPrint = new TestPrint();
@@ -138,37 +139,41 @@ contract PrintMessageTest is CreateWalletTest {
 
         Client.Any2EVMMessage memory messageReceived = baseMessageReceived;
 
-        UserOperation memory userOp = userOpBase;
         TestEscrow.PaymasterAndData memory paymasterAndData = basePaymasterAndData;
         paymasterAndData.chainId = uint64(block.chainid);
         paymasterAndData.paymaster = testPaymasterAddress;
         paymasterAndData.amount = 100000000000000;
+        paymasterAndData.owner = eoaAddress;
+
+        UserOperation memory userOp = userOpBase;
         userOp.nonce = 240;
-        userOp.sender = eoaAddress;
+        userOp.sender = hypergateWalletAddress;
         userOp.paymasterAndData = abi.encode(paymasterAndData);
         userOp.callData = abi.encodePacked(bytes4(0xb61d27f6),
-bytes32(0x000000000000000000000000c532a74256d3db42d0bf7a0400fefdbad7694008),
-bytes32(0x00000000000000000000000000000000000000000000000000038d7ea4c68000),
-bytes32(0x0000000000000000000000000000000000000000000000000000000000000060),
-bytes32(0x00000000000000000000000000000000000000000000000000000000000000e4),
-bytes32(0x7ff36ab500000000000000000000000000000000000000000000000000000000),
-bytes32(0x0000000000000000000000000000000000000000000000000000000000000000),
-bytes32(0x0000008000000000000000000000000052eb5d94da6146836b0a6c542b69545d),
-bytes32(0xd35fda6d00000000000000000000000000000000000000000000000000000000),
-bytes32(0x669e545500000000000000000000000000000000000000000000000000000000),
-bytes32(0x000000020000000000000000000000007b79995e5f793a07bc00c21412e50eca),
-bytes32(0xe098e7f9000000000000000000000000ae0086b0f700d6d7d4814c4ba1e55d3b),
-bytes32(0xc0dfee0200000000000000000000000000000000000000000000000000000000));
+            bytes32(0x000000000000000000000000c532a74256d3db42d0bf7a0400fefdbad7694008),
+            bytes32(0x00000000000000000000000000000000000000000000000000038d7ea4c68000),
+            bytes32(0x0000000000000000000000000000000000000000000000000000000000000060),
+            bytes32(0x00000000000000000000000000000000000000000000000000000000000000e4),
+            bytes32(0x7ff36ab500000000000000000000000000000000000000000000000000000000),
+            bytes32(0x0000000000000000000000000000000000000000000000000000000000000000),
+            bytes32(0x0000008000000000000000000000000052eb5d94da6146836b0a6c542b69545d),
+            bytes32(0xd35fda6d00000000000000000000000000000000000000000000000000000000),
+            bytes32(0x669e545500000000000000000000000000000000000000000000000000000000),
+            bytes32(0x000000020000000000000000000000007b79995e5f793a07bc00c21412e50eca),
+            bytes32(0xe098e7f9000000000000000000000000ae0086b0f700d6d7d4814c4ba1e55d3b),
+            bytes32(0xc0dfee0200000000000000000000000000000000000000000000000000000000));
         console.log("data length", userOp.paymasterAndData.length);
+
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
+        console.log("useropHash", vm.toString(userOpHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
         userOp.signature = abi.encodePacked(r, s, v);
 
-        //messageSent.receiver = abi.encode(testEscrowAddress);
         messageReceived.messageId = bytes32(uint256(1000));
         messageReceived.sourceChainSelector = uint64(bytes8(bytes4(0xb63e800d)));
         messageReceived.sender = abi.encode(bytes32(bytes20(address(this))));
         messageReceived.data = abi.encode(userOp);
+
         string memory out = vm.toString(abi.encode(messageReceived));
         console.log(out);
         out = vm.toString(abi.encode(messageReceived.data));
@@ -177,13 +182,14 @@ bytes32(0xc0dfee0200000000000000000000000000000000000000000000000000000000));
         console.log("sender", vm.toString(messageReceived.sender));
         console.log("eoa", eoaAddress);
         console.log("signature", vm.toString(userOp.signature));
-        console.log("msgrop", out);
-        console.log("userop", vm.toString(abi.encode(userOp)));
+        console.log("op length", vm.toString(abi.encode(userOp).length));
+        // console.log("msgrop", out);
+        // console.log("userop", vm.toString(abi.encode(userOp)));
 
 
         vm.prank(ccipRouter);
         testEscrow.printOp(messageReceived);
-        //vm.expectEmit();
+        // vm.expectEmit();
 
 
     }
