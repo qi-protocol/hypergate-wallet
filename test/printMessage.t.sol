@@ -47,6 +47,10 @@ contract PrintMessageTest is CreateWalletTest {
 
     address ccipRouter = address(bytes20(keccak256(abi.encode("ccip router"))));
     address dummyPaymaster = address(bytes20(keccak256(abi.encode("dummy paymaster"))));
+    address dummyReceiver = address(bytes20(keccak256(abi.encode("dummy receiver"))));
+
+    uint256 chainId_1 = 123; // origin
+    uint256 chainId_2 = 456; // execution
 
     TestEscrow.PaymasterAndData public basePaymasterAndData = TestEscrow.PaymasterAndData({
         paymaster: address(0),
@@ -57,16 +61,18 @@ contract PrintMessageTest is CreateWalletTest {
     });
 
     function setUp() public virtual override {
+        vm.chainId(chainId_1);
         super.setUp();
         testEscrow = new TestEscrow();
         testEscrowAddress = address(testEscrow);
         testEscrow.addEntryPoint(entryPointAddress, uint64(block.chainid));
-        testPaymaster = new TestPaymaster(IEntryPoint(entryPointAddress), address(0));
-        testPaymasterAddress = address(testPaymaster);
+        testEscrow.addCCIPAddress(ccipRouter, true);
         testPrint = new TestPrint();
         testPrintAddress = address(testPrint);
-        testEscrow.addCCIPAddress(ccipRouter, true);
-        //addCCIPAddress
+
+        vm.chainId(chainId_2);
+        testPaymaster = new TestPaymaster(IEntryPoint(entryPointAddress), address(0), dummyReceiver);
+        testPaymasterAddress = address(testPaymaster);
     }
 
 // struct Any2EVMMessage {
@@ -110,16 +116,82 @@ contract PrintMessageTest is CreateWalletTest {
     }
     */
 
-    // Implement Test: TestEscrow HandleMessage
-    // Implement Test: TestEscrow PrintOp
-    // Implement Test: TestEscrow CallPrintOp
-    function testEscrowHandleMessage() public {
+    function testEscrowDeposit() public {
         string memory key = vm.readFile(".secret");
         bytes32 key_bytes = vm.parseBytes32(key);
         uint256 privateKey;
         assembly {
             privateKey := key_bytes
         }
+
+        bytes32 timeHash = testEscrow.hashSeconds(eoaAddress, 3600);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, timeHash.toEthSignedMessageHash());
+        bytes memory timeSignature = abi.encodePacked(r, s, v);
+
+        vm.deal(eoaAddress, 10 ether);
+
+        vm.prank(eoaAddress);
+        testEscrow.deposit{value: 5 ether}(eoaAddress, address(0), 5 ether);
+
+        require(testEscrowAddress.balance == 5 ether);
+        require(testEscrow.getBalance(eoaAddress, address(0)) == 5 ether);
+    }
+
+    function testEscrowWithdraw() public {
+        vm.chainId(chainId_1);
+        string memory key = vm.readFile(".secret");
+        bytes32 key_bytes = vm.parseBytes32(key);
+        uint256 privateKey;
+        assembly {
+            privateKey := key_bytes
+        }
+
+        vm.deal(eoaAddress, 10 ether);
+
+        vm.prank(eoaAddress);
+        testEscrow.deposit{value: 5 ether}(eoaAddress, address(0), 5 ether);
+
+        require(testEscrowAddress.balance == 5 ether);
+        require(testEscrow.getBalance(eoaAddress, address(0)) == 5 ether);
+
+        // new withdraw
+        testEscrow.withdraw(eoaAddress, address(0), 1 ether);
+        require(testEscrowAddress.balance == 4 ether);
+        require(testEscrow.getBalance(eoaAddress, address(0)) == 4 ether);
+        require(eoaAddress.balance == 6 ether);
+
+        // create lock
+        uint256 oldDeadline = testEscrow.getDeadline(eoaAddress);
+        bytes32 timeHash = testEscrow.hashSeconds(eoaAddress, 3600);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, timeHash.toEthSignedMessageHash());
+        bytes memory timeSignature = abi.encodePacked(r, s, v);
+        testEscrow.extendLock(eoaAddress, 3600, timeSignature);
+        require(testEscrow.getDeadline(eoaAddress) > oldDeadline);
+        
+        vm.expectRevert();
+        testEscrow.withdraw(eoaAddress, address(0), 1 ether);
+    }
+
+    // Implement Test: TestEscrow HandleMessage
+    // Implement Test: TestEscrow PrintOp
+    // Implement Test: TestEscrow CallPrintOp
+    function testEscrowHandleMessage() public {
+        vm.chainId(chainId_1);
+        string memory key = vm.readFile(".secret");
+        bytes32 key_bytes = vm.parseBytes32(key);
+        uint256 privateKey;
+        assembly {
+            privateKey := key_bytes
+        }
+
+        vm.deal(eoaAddress, 10 ether);
+        vm.prank(eoaAddress);
+        testEscrow.deposit{value: 5 ether}(eoaAddress, address(0), 5 ether);
+        uint256 oldDeadline = testEscrow.getDeadline(eoaAddress);
+        bytes32 timeHash = testEscrow.hashSeconds(eoaAddress, 3600);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, timeHash.toEthSignedMessageHash());
+        bytes memory timeSignature = abi.encodePacked(r, s, v);
+        testEscrow.extendLock(eoaAddress, 3600, timeSignature);
 
         // baseMessage = Client.EVM2AnyMessage({
         //     receiver: abi.encode(receiver),
@@ -143,6 +215,7 @@ contract PrintMessageTest is CreateWalletTest {
         paymasterAndData.chainId = uint64(block.chainid);
         paymasterAndData.paymaster = testPaymasterAddress;
         paymasterAndData.amount = 100000000000000;
+                            //   5000000000000000000
         paymasterAndData.owner = eoaAddress;
 
         UserOperation memory userOp = userOpBase;
@@ -165,8 +238,8 @@ contract PrintMessageTest is CreateWalletTest {
         console.log("data length", userOp.paymasterAndData.length);
 
         bytes32 userOpHash = entryPoint.getUserOpHash(userOp);
-        console.log("useropHash", vm.toString(userOpHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
+        //console.log("useropHash", vm.toString(userOpHash));
+        (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
         userOp.signature = abi.encodePacked(r, s, v);
 
         messageReceived.messageId = bytes32(uint256(1000));
@@ -175,7 +248,7 @@ contract PrintMessageTest is CreateWalletTest {
         messageReceived.data = abi.encode(userOp);
 
         string memory out = vm.toString(abi.encode(messageReceived));
-        console.log(out);
+        //console.log(out);
         out = vm.toString(abi.encode(messageReceived.data));
         console.log("chainId", block.chainid);
         console.log("destTokenAmounts", vm.toString(abi.encode(messageReceived.destTokenAmounts)));
@@ -193,6 +266,7 @@ contract PrintMessageTest is CreateWalletTest {
 
 
     }
+    
     function testEscrowPrintOp() public {}
     function testEscrowCallPrintOp() public {}
 }

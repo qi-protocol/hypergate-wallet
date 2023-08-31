@@ -62,6 +62,10 @@ contract TestEscrow is Ownable {
         return _accountInfo[account_].assetBalance[asset_];
     }
 
+    function getDeadline(address account_) public returns(uint256) {
+        return _accountInfo[account_].deadline;
+    }
+
     function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
         _entryPoint[chainId_] = entryPoint_;
     }
@@ -490,10 +494,14 @@ contract TestEscrow is Ownable {
     ///      This is crypographically secured.
     function extendLock(address account_, uint256 seconds_, bytes memory signature_) public {
         if(account_ == address(0)) {
-            InvalidOwner(account_);
+            revert InvalidOwner(account_);
         }
 
-        bytes32 hash_ = _hashSeconds(account_, seconds_);
+        if(_accountInfo[account_].deadline >= block.timestamp + seconds_) {
+            revert InvalidTimeInput();
+        }
+
+        bytes32 hash_ = hashSeconds(account_, seconds_);
         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_.toEthSignedMessageHash(), signature_);
         if (error != ECDSA.RecoverError.NoError) {
             revert BadSignature();
@@ -503,10 +511,10 @@ contract TestEscrow is Ownable {
             revert InvalidSignature(account_, recovered);
         }
 
-        _accountInfo[account_].deadline = _accountInfo[account_].deadline + seconds_;
+        _accountInfo[account_].deadline = block.timestamp + seconds_;
     }
 
-    function _hashSeconds(address account_, uint256 seconds_) public returns(bytes32) {
+    function hashSeconds(address account_, uint256 seconds_) public returns(bytes32) {
         return keccak256(abi.encode(account_, seconds_));
     }
 
@@ -577,13 +585,6 @@ contract TestEscrow is Ownable {
 //     EVMTokenAmount[] destTokenAmounts; // Tokens and their amounts in their destination chain representation.
 //   }
     function printOp(Client.Any2EVMMessage memory message) payable external locked {
-        // latestMessageId = message.messageId;
-        // latestSourceChainSelector = message.sourceChainSelector;
-        // latestSender = abi.decode(message.sender, (address));
-        // latestMessage = abi.decode(message.data, (string));
-        // validate msg.sender is ccip source
-        // cast data into userop
-        // ignore the rest
         if(!ccipAddress[msg.sender]) {
             revert InvalidCCIPAddress(msg.sender);
         }
@@ -621,26 +622,24 @@ contract TestEscrow is Ownable {
         if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
         if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
 
-        revert(uint256(uint160(paymasterAndData.owner)).toString());
-        revert(uint256(_accountInfo[paymasterAndData.owner].assetBalance[paymasterAndData.asset]).toString());
-
         Escrow storage accountInfo_ = _accountInfo[paymasterAndData.owner];
-        if(block.timestamp > accountInfo_.deadline) { revert(""); }
-        // get nonce for payment listing _accountInfo.nonce
-
+        if(block.timestamp > accountInfo_.deadline) { revert InvalidDeadline(""); }
+        
+        // revert(uint256(uint160(paymasterAndData.owner)).toString());
+        // revert(uint256(_accountInfo[paymasterAndData.owner].assetBalance[paymasterAndData.asset]).toString());
+        
         // Transfer amount of asset to receiver
         bool success_;
         address asset_ = paymasterAndData.asset;
+        if(accountInfo_.assetBalance[asset_] < paymasterAndData.amount) { 
+            revert InsufficentFunds(paymasterAndData.owner, asset_, paymasterAndData.amount);
+        }
+
         if(asset_ == address(0)) { // address(0) == ETH
-            if(accountInfo_.assetBalance[asset_] >= paymasterAndData.amount) { revert(""); }
-            // insufficent address(this) balance will auto-revert
             (success_,) = payable(receiver_).call{value: paymasterAndData.amount}("");
         } else {
-            if(accountInfo_.assetBalance[asset_] >= paymasterAndData.amount) { 
-                revert InsufficentFunds(paymasterAndData.owner, asset_, paymasterAndData.amount);
-            }
             // insufficent address(this) balance will auto-revert
-            bytes memory payload_ = abi.encodeWithSignature(
+            payload_ = abi.encodeWithSignature(
                 "transferFrom(address,address,uint256)", 
                 address(this), 
                 receiver_, 
@@ -667,10 +666,21 @@ contract TestEscrow is Ownable {
             receiver_
         );
         accountInfo_.nonce++;
-        //revert((uint256(paymasterAndData.amount)).toString());
-        if(paymasterAndData.amount < address(this).balance) {
-            revert BalanceError(paymasterAndData.amount, address(this).balance);
+
+        uint256 escrowBalance_;
+        
+        if(asset_ == address(0)) {
+            escrowBalance_ = address(this).balance;
+        } else {
+            payload_ = abi.encodeWithSignature("balanceOf(address)", address(this));
+            assembly {
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0, 0x20))
+                returndatacopy(0, 0, 0x20)
+                escrowBalance_ := mload(0)
+            }
         }
+
+        _escrowBalance[asset_] = escrowBalance_;
 
         emit PrintUserOp(mUserOp, paymasterAndData);
     }
@@ -718,7 +728,9 @@ contract TestEscrow is Ownable {
     error InvalidOwner(address owner);
     error InvalidPaymaster(address paymaster);
     error InvalidSignature(address owner, address notOwner);
+    error InvalidTimeInput();
     error InvalidDeltaValue();
+    error InvalidDeadline(string);
     error BadSignature();
     error BalanceError(uint256 requested, uint256 actual);
 
