@@ -24,3 +24,6 @@
 	path = lib/account-abstraction
 	url = https://github.com/proofofsoulprotocol/account-abstraction
 	branch = ver0.6.0
+[submodule "chain-selectors"]
+	path = chain-selectors
+	url = https://github.com/smartcontractkit/chain-selectors

@@ -65,7 +65,7 @@ contract TestPaymaster is BasePaymaster {
 
     function getFee(
         uint64 destinationChainSelector,
-        address receiver,
+        address receiver_,
         UserOperation calldata userOp
     ) public returns(uint256) {
         // uint256 paymasterAndDataLength = data.length;
@@ -91,13 +91,13 @@ contract TestPaymaster is BasePaymaster {
             revert InvalidAsset(chainId_, asset_);
         }
 
-        address receiver = escrowAddress[chainId_] != address(0) ? escrowAddress[chainId_] : address(this);
+        address receiver_ = escrowAddress[chainId_] != address(0) ? escrowAddress[chainId_] : address(this);
 
-        this.send{value: amount_}(chainId_, escrowAddress[chainId_], abi.encode(userOp, receiver));
-        bytes memory data = abi.encode(userOp, receiver);
+        this.send{value: amount_}(chainId_, escrowAddress[chainId_], abi.encode(userOp, receiver_));
+        bytes memory data = abi.encode(userOp, receiver_);
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
+            receiver: abi.encode(receiver_),
             data: abi.encode(_selector, data),
             tokenAmounts: new Client.EVMTokenAmount[](0), // no tokens
             extraArgs: "", // no extra

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.15;
 
-import {Vm as vm} from "forge-std/Vm.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdCheats.sol";
 import "forge-std/console.sol";
@@ -192,7 +191,20 @@ contract PrintMessageTest is CreateWalletTest {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, timeHash.toEthSignedMessageHash());
         bytes memory timeSignature = abi.encodePacked(r, s, v);
         testEscrow.extendLock(eoaAddress, 3600, timeSignature);
+        console.log("eoadAddress:", eoaAddress);
+        console.log("lockTime:", 3600);
+        console.log("timeSignature:", vm.toString(abi.encode(timeSignature)));
+// 0x7fa9385be102ac3eac297483dd6233d62b3e1496
+// 0x435bce917a3a93443ec01b71550afb00d4ecddef574fdb92663d1be122ea3656384b73617fb94788704697059f3405c07780dfefb04e967130c54df2a223db6c1c
+// bytes32 hash_ = hashSeconds(account_, seconds_);
+//         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(hash_.toEthSignedMessageHash(), signature_);
+//         if (error != ECDSA.RecoverError.NoError) {
+//             revert BadSignature();
+//         }
 
+//         if(recovered != account_) {
+//             revert InvalidSignature(account_, recovered);
+//         }
         // baseMessage = Client.EVM2AnyMessage({
         //     receiver: abi.encode(receiver),
         //     data: abi.encode(_selector, data),
