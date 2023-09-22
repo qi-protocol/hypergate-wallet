@@ -557,7 +557,7 @@ contract TestEscrow is Ownable {
         return _accountInfo(account).assetBalance[asset];
     }
 
-    function getDeadline() public view returns(uint256) {
+    function getDeadline(address account) public view returns(uint256) {
         return _accountInfo(account).deadline;
     }
 
