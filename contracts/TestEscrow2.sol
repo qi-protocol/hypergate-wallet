@@ -2,7 +2,6 @@
 pragma solidity ^0.8.17;
 
 import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
-import {Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
