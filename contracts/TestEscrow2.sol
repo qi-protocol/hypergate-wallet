@@ -68,6 +68,14 @@ contract TestEscrow is Ownable {
         return _accountInfo[account_].deadline;
     }
 
+    function getNonce(address account_) public view returns(uint256) {
+        return _accountInfo(account_).nonce;
+    }
+
+    function getPayment(address account_, uint256 nonce_) public view returns(Payment memory) {
+        return _accountInfo(account_).history[nonce_];
+    }
+
     function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
         _entryPoint[chainId_] = entryPoint_;
     }
@@ -551,22 +559,6 @@ contract TestEscrow is Ownable {
 
         accountInfo_.assetBalance[asset_] = accountInfo_.assetBalance[asset_] - amount_;
 
-    }
-
-    function getBalance(address account, address asset) public view returns(uint256) {
-        return _accountInfo(account).assetBalance[asset];
-    }
-
-    function getDeadline(address account) public view returns(uint256) {
-        return _accountInfo(account).deadline;
-    }
-
-    function getNonce(address account) public view returns(uint256) {
-        return _accountInfo(account).nonce;
-    }
-
-    function getPayment(address account, uint256 nonce) public view returns(Payment memory) {
-        return _accountInfo(account).history[nonce];
     }
 
     function handle(
