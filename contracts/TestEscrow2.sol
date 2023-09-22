@@ -553,6 +553,22 @@ contract TestEscrow is Ownable {
 
     }
 
+    function getBalance(address account, address asset) public view returns(uint256) {
+        return _accountInfo(account).assetBalance[asset];
+    }
+
+    function getDeadline() public view returns(uint256) {
+        return _accountInfo(account).deadline;
+    }
+
+    function getNonce(address account) public view returns(uint256) {
+        return _accountInfo(account).nonce;
+    }
+
+    function getPayment(address account, uint256 nonce) public view returns(Payment memory) {
+        return _accountInfo(account).history[nonce];
+    }
+
     function handle(
         uint32 _origin,
         bytes32 _sender,
