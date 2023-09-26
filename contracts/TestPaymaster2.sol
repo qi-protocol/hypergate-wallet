@@ -33,9 +33,9 @@ interface IIGP {
 // validateSignature == owner
 // transfer amount to paymaster 
 contract TestPaymaster is BasePaymaster {
-    mapping(uint32 => address) public escrowAddress;
-    mapping(uint32 => bool) public acceptedChain; // destinationDomain
-    mapping(uint32 => mapping(address => bool)) public acceptedAsset;
+    mapping(uint256 => address) public escrowAddress;
+    mapping(uint256 => bool) public acceptedChain; // destinationDomain
+    mapping(uint256 => mapping(address => bool)) public acceptedAsset;
     mapping(address => bool) public acceptedOrigin;
     
     bytes4 _selector;
@@ -74,19 +74,19 @@ contract TestPaymaster is BasePaymaster {
         defaultReceiver = defaultReceiver_;
     }
 
-    function getEscrowAddress(uint32 chainId) public view returns(address) {
+    function getEscrowAddress(uint256 chainId) public view returns(address) {
         return escrowAddress[chainId];
     }
 
-    function addEscrow(uint32 chainId, address escrowAddress_) public onlyOwner {
+    function addEscrow(uint256 chainId, address escrowAddress_) public onlyOwner {
         escrowAddress[chainId] = escrowAddress_;
     }
 
-    function addAcceptedChain(uint32 chainId_, bool state_) public onlyOwner {
+    function addAcceptedChain(uint256 chainId_, bool state_) public onlyOwner {
         acceptedChain[chainId_] = state_;
     }
 
-    function addAcceptedAsset(uint32 chainId_, address asset_, bool state_) public onlyOwner {
+    function addAcceptedAsset(uint256 chainId_, address asset_, bool state_) public onlyOwner {
         acceptedAsset[chainId_][asset_] = state_;
     }
 

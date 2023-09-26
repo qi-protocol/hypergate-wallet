@@ -59,15 +59,15 @@ contract TestEscrow is Ownable, ITestEscrow {
         return _accountInfo[account_].history[nonce_];
     }
 
-    function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
+    function addEntryPoint(uint256 chainId_, address entryPoint_) public override onlyOwner {
         _entryPoint[chainId_] = entryPoint_;
     }
 
-    function addCCIPAddress(address ccip, bool state) public onlyOwner {
+    function addCCIPAddress(address ccip, bool state) public override onlyOwner {
         ccipAddress[ccip] = state;
-    }
+    } // supposedly we want to have one escrow for multiple oracle senders
 
-    function addHyperlaneAddress(address hyperlane, bool state) public onlyOwner {
+    function addHyperlaneAddress(address hyperlane, bool state) public override onlyOwner {
         hyperlaneAddress[hyperlane] = state;
     }
 
@@ -792,7 +792,7 @@ contract TestEscrow is Ownable, ITestEscrow {
         //revert((uint256(uint160(paymasterAndData.owner))).toString());
 
         if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
-        if(paymasterAndData.chainId == uint64(0)) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.chainId == uint256(0)) { revert InvalidChain(paymasterAndData.chainId); }
         if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
         if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
 

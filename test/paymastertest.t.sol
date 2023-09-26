@@ -15,6 +15,7 @@ import {TestEscrow} from "contracts/TestEscrow2.sol";
 import {PaymasterAndData, PaymasterAndData2} from "contracts/interfaces/ITestEscrow.sol";
 import {HyperlaneMailbox} from "contracts/test/HyperlaneMailbox.sol";
 import {HyperlaneIGP} from "contracts/test/HyperlaneIGP.sol"; 
+import {ERC20} from "contracts/test/ERC20.sol";
 
 /**
 What I need
@@ -46,10 +47,14 @@ What I need
     address hyperlaneMailboxAddress;
     HyperlaneIGP _hyperlaneIGP;
     address hyperlaneIGPAddress;
+    ERC20 _ERC20;
+    address ERC20Address;
 
     uint256 internal constant SALT = 0x55;
 
     address internal constant RECEIVER = address(bytes20(bytes32(keccak256("defaultReceiver"))));
+
+    address internal constant BUNDLER = address(bytes20(bytes32(keccak256("defaultBundler"))));
 
     UserOperation public userOpBase = UserOperation({
         sender: address(0),
@@ -87,6 +92,9 @@ What I need
         super.setUp();
         uint256 gas;
 
+        _ERC20 = new ERC20("Test Token", "TKN");
+        ERC20Address = address(_ERC20);
+
         entryPoint_ = new EntryPoint();
         entryPointAddress = address(entryPoint_);
 
@@ -105,9 +113,16 @@ What I need
             RECEIVER//address defaultReceiver_
         );
         testPaymasterAddress = address(_testPaymaster);
+        _testPaymaster.addEscrow(block.chainid, testEscrowAddress);
+        _testPaymaster.addAcceptedChain(block.chainid, true);
+        _testPaymaster.addAcceptedAsset(block.chainid, address(0), true);
+        _testPaymaster.addAcceptedOrigin(BUNDLER, true);
 
         _testEscrow = new TestEscrow();
         testEscrowAddress = address(_testEscrow);
+        _testEscrow.addEntryPoint(block.chainid, entryPointAddress);
+        _testEscrow.addHyperlaneAddress(hyperlaneMailboxAddress, true);
+
 
         // needs to execute and accept message on chain A
         // then execute handle on chain B
