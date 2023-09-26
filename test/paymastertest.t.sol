@@ -3,7 +3,13 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 
-import {IMailbox, IIGP, TestPaymaster, IEntryPoint} from "flat/TestPaymaster2_f.sol";
+//import {IMailbox, IIGP, TestPaymaster, IEntryPoint} from "flat/TestPaymaster2_f.sol";
+//import "contracts/interfaces/ITestEscrow.sol";
+
+import {IEntryPoint, EntryPoint, IAccount} from "@4337/core/EntryPoint.sol";
+import {SimpleAccount, SimpleAccountFactory} from "@4337/samples/SimpleAccountFactory.sol";
+import {TestPaymaster} from "contracts/TestPaymaster.sol";
+import {TestEscrow} from "contracts/TestEscrow.sol";
 import "contracts/interfaces/ITestEscrow.sol";
 
 /**
@@ -19,15 +25,15 @@ What I need
  */
 
  contract PaymasterTest {
-    IEntryPoint entryPoint;
+    IEntryPoint entryPoint_;
     address entryPointAddress;
-    ISimpleAccountFactory simpleAccountFactory;
+    SimpleAccountFactory simpleAccountFactory_;
     address simpleAccountFactoryAddress;
-    ISimpleAccount simpleAccount;
+    SimpleAccount simpleAccount_;
     address simpleAccountAddress;
-    TestPaymaster testPaymaster;
+    TestPaymaster testPaymaster_;
     address testPaymasterAddress;
-    TestEscrow testEscrow;
+    TestEscrow testEscrow_;
     address testEscrowAddress;
 
     uint256 internal constant SALT = 0x55;
@@ -46,26 +52,33 @@ What I need
         signature: new bytes(0)
     });
 
-    PaymasterAndData public paymasterAndDataBase = PaymasterAndData({
+    PaymasterAndData public paymasterAndDataBase = PaymasterAndData({ // need to fix paymasterAndData ordering
         paymaster: address(0),
+        owner: address(0),
         chainId: uint256(0),
         asset: address(0),
-        owner: address(0),
         amount: uint256(0)
     });
 
-    PaymasterAndData public paymasterAndDataBase2 = PaymasterAndData2({
+    PaymasterAndData2 public paymasterAndDataBase2 = PaymasterAndData2({
         paymaster: address(0),
-        chainId: uint256(0),
-        asset: address(0),
         owner: address(0),
-        amount: uint256(0)
+        chainId: uint256(0),
+        paymentAsset: address(0),
+        paymentAmount: uint256(0),
+        transferAsset: address(0),
+        transferAmount: uint256(0)
     });
 
     function setup() public {
         // needs to create entrypoint
+
+
         //
     }
 
     function testPaymaster() public {}
+
+    // test the execution of assets moving from paymaster to be used by the AA account
+    function testPaymaster2() public {}
  }

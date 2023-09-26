@@ -2212,7 +2212,7 @@ contract TestPaymaster is BasePaymaster {
         address paymentAsset_ = address(bytes20(data[72:92]));
         uint256 paymentAmount_ = uint256(bytes32(data[92:124]));
         // payable: can be anything so long as paymaster has sufficent funds
-        // TODO
+        // TODO: will enable bridge functionality
         // address transferAsset_ = address(bytes20(data[124:144]));
         // uint256 transferAmount_ = uint256(bytes32(data[144:176]));
 

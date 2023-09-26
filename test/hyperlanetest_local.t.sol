@@ -71,7 +71,6 @@ contract PrintMessageTest is CreateWalletTest {
     function setUp() public virtual override {
         //vm.chainId(chainId_1);
         super.setUp();
-0x0000000000000000000000000000000000000000
         originMailbox = new MockMailbox(originDomain);
         destinationMailbox = new MockMailbox(destinationDomain);
         originMailbox.addRemoteMailbox(destinationDomain, destinationMailbox);
