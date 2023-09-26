@@ -11,6 +11,7 @@ remappings = [
     "@openzeppelin/=lib/openzeppelin-contracts/",
     "openzeppelin/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "safe-core-sdk/=lib/safe-core-sdk/",
+    "@4337/=lib/account-abstraction/contracts/"
 ]
 fs_permissions = [{ access = "read-write", path = ".secret"}, { access ="read", path="./out/"}]
 gas_reports = ["*"]
