@@ -3,55 +3,48 @@ pragma solidity ^0.8.17;
 
 // import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 
+struct Payment {
+    uint256 timestamp;
+    uint256 assetAmount;
+    uint256 id;
+    uint256 chainId;
+    address asset;
+    address to;
+}
+
+struct PaymasterAndData {
+    address paymaster;
+    address owner;
+    uint256 chainId;
+    address asset;
+    uint256 amount;
+}
+
+struct PaymasterAndData2 {
+    address paymaster;
+    address owner;
+    uint256 chainId;
+    address paymentAsset;
+    uint256 paymentAmount;
+    address transferAsset;
+    uint256 transferAmount;
+}
+
+struct UserOperation {
+    address sender;
+    uint256 nonce;
+    bytes initCode;
+    bytes callData;
+    uint256 callGasLimit;
+    uint256 verificationGasLimit;
+    uint256 preVerificationGas;
+    uint256 maxFeePerGas;
+    uint256 maxPriorityFeePerGas;
+    bytes paymasterAndData;
+    bytes signature;
+}
+
 interface ITestEscrow {
-
-    struct Escrow {
-        uint256 deadline;
-        uint256 nonce;
-        mapping(uint256 => Payment) history;
-        mapping(address => uint256) assetBalance;
-    }
-
-    struct Payment {
-        uint256 timestamp;
-        uint256 assetAmount;
-        uint256 id;
-        uint256 chainId;
-        address asset;
-        address to;
-    }
-
-    struct PaymasterAndData {
-        address paymaster;
-        address owner;
-        uint256 chainId;
-        address asset;
-        uint256 amount;
-    }
-
-    struct PaymasterAndData2 {
-        address paymaster;
-        address owner;
-        uint256 chainId;
-        address paymentAsset;
-        uint256 paymentAmount;
-        address transferAsset;
-        uint256 transferAmount;
-    }
-
-    struct UserOperation {
-        address sender;
-        uint256 nonce;
-        bytes initCode;
-        bytes callData;
-        uint256 callGasLimit;
-        uint256 verificationGasLimit;
-        uint256 preVerificationGas;
-        uint256 maxFeePerGas;
-        uint256 maxPriorityFeePerGas;
-        bytes paymasterAndData;
-        bytes signature;
-    }
 
     function interchainSecurityModule() external view returns(address);
     function getBalance(address account_, address asset_) external returns(uint256);
@@ -90,6 +83,4 @@ interface ITestEscrow {
     error BalanceError(uint256 requested, uint256 actual);
 
     event PrintUserOp(UserOperation userOp, PaymasterAndData paymasterAndData);
-
-    fallback() external payable {}
 }
