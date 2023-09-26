@@ -46,9 +46,9 @@ contract TestPaymaster is BasePaymaster {
     // later version this will be packed instead
     struct PaymasterAndData {
         address paymaster;
-        uint64 chainId;
-        address asset;
         address owner;
+        uint256 chainId;
+        address asset;
         uint256 amount;
     }
 
@@ -116,7 +116,7 @@ contract TestPaymaster is BasePaymaster {
         // non-payable
         address paymaster_ = address(bytes20(data[:20]));
         address owner_ = address(bytes20(data[20:40]));
-        uint32 chainId_ = uint32(uint256(bytes32(data[40:72])));
+        uint256 chainId_ = uint256(bytes32(data[40:72]));
         address paymentAsset_ = address(bytes20(data[72:92]));
         uint256 paymentAmount_ = uint256(bytes32(data[92:124]));
         // payable: can be anything so long as paymaster has sufficent funds
@@ -124,28 +124,28 @@ contract TestPaymaster is BasePaymaster {
         // address transferAsset_ = address(bytes20(data[124:144]));
         // uint256 transferAmount_ = uint256(bytes32(data[144:176]));
 
-        // paymaster must elect to accept funds from specific chains
-        if(!acceptedChain[chainId_]) {
-            revert InvalidChainId(chainId_);
-        }
-
-        if(!acceptedAsset[chainId_][paymentAsset_]) {
-            revert InvalidAsset(chainId_, paymentAsset_);
-        }
-
         bytes32 messageId_;
-        uint32 destinationDomain_ = uint32(chainId_);
         uint256 gasAmount_ = 100000;
+        uint32 destinationDomain_ = uint32(chainId_);
+
+        // paymaster must elect to accept funds from specific chains
+        if(!acceptedChain[destinationDomain_]) {
+            revert InvalidChainId(destinationDomain_);
+        }
+
+        if(!acceptedAsset[destinationDomain_][paymentAsset_]) {
+            revert InvalidAsset(destinationDomain_, paymentAsset_);
+        }
 
         // for now non-staked deposit is used for the oracle call
         // DepositInfo memory depositInfo_ = entryPoint.deposits(address(this));
         // require(depositInfo_.deposit >= 0.2 ether);
         entryPoint.withdrawTo(payable(address(this)), 0.2 ether);
 
-        address receiver = escrowAddress[chainId_] != address(0) ? escrowAddress[chainId_] : address(this);
+        address receiver = escrowAddress[destinationDomain_] != address(0) ? escrowAddress[destinationDomain_] : address(this);
         bytes32 recipientAddress_ = bytes32(uint256(uint160(receiver)));
         IMailbox(hyperlane_mailbox).dispatch(destinationDomain_, recipientAddress_, abi.encode(userOp, receiver));
-        IIGP(hyperlane_igp).quoteGasPayment(chainId_, gasAmount_);
+        IIGP(hyperlane_igp).quoteGasPayment(destinationDomain_, gasAmount_);
         context = abi.encode(messageId_, destinationDomain_, gasAmount_);
     }}
 
