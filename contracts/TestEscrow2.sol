@@ -2,7 +2,6 @@
 pragma solidity ^0.8.17;
 
 import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
-import {Client} from "lib/ccip-starter-kit-foundry/src/BasicMessageSender.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
@@ -25,6 +24,8 @@ contract TestEscrow is Ownable {
     mapping(address => bool) layerZeroAddress;
     mapping(address => bool) hyperlaneAddress;
     mapping(address => uint256) _escrowBalance;
+
+    address public interchainSecurityModule;
 
     struct Escrow {
         uint256 deadline;
@@ -66,12 +67,24 @@ contract TestEscrow is Ownable {
         return _accountInfo[account_].deadline;
     }
 
+    function getNonce(address account_) public view returns(uint256) {
+        return _accountInfo(account_).nonce;
+    }
+
+    function getPayment(address account_, uint256 nonce_) public view returns(Payment memory) {
+        return _accountInfo(account_).history[nonce_];
+    }
+
     function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
         _entryPoint[chainId_] = entryPoint_;
     }
 
     function addCCIPAddress(address ccip, bool state) public onlyOwner {
         ccipAddress[ccip] = state;
+    }
+
+    function addHyperlaneAddress(address hyperlane, bool state) public onlyOwner {
+        hyperlaneAddress[hyperlane] = state;
     }
 
     function pack(UserOperation calldata userOp) internal pure returns (bytes memory ret) {
@@ -545,6 +558,112 @@ contract TestEscrow is Ownable {
 
         accountInfo_.assetBalance[asset_] = accountInfo_.assetBalance[asset_] - amount_;
 
+    }
+
+    function handle(
+        uint32 _origin,
+        bytes32 _sender,
+        bytes calldata message
+        ) external {
+
+        if(!hyperlaneAddress[msg.sender]) {
+            revert InvalidCCIPAddress(msg.sender);
+        }
+
+        // deserialize userop and paymasterAndData
+        (UserOperation memory mUserOp, address receiver_) = abi.decode(message, (UserOperation, address));
+        PaymasterAndData memory paymasterAndData = abi.decode(mUserOp.paymasterAndData, (PaymasterAndData));
+
+        // hash userop locally
+        bytes memory payload_ = abi.encodeWithSelector(bytes4(0x7b1d0da3), mUserOp);
+        bytes32 userOpHash;
+        assembly {
+            pop(call(gas(), address(), 0, add(payload_, 0x20), mload(payload_), 0, 0x20))
+            userOpHash := mload(0)
+        }
+        userOpHash = keccak256(abi.encode(
+            userOpHash, 
+            _entryPoint[paymasterAndData.chainId], 
+            uint256(paymasterAndData.chainId)
+        ));
+        
+        // validate signature
+        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(userOpHash.toEthSignedMessageHash(), mUserOp.signature);
+        if (error != ECDSA.RecoverError.NoError) {
+            revert BadSignature();
+        } else {
+            if(recovered != paymasterAndData.owner) {
+                revert InvalidSignature(paymasterAndData.owner, recovered);
+            }
+        }
+        //revert((uint256(uint160(paymasterAndData.owner))).toString());
+
+        if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
+        if(paymasterAndData.chainId == uint64(0)) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
+        if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
+
+        Escrow storage accountInfo_ = _accountInfo[paymasterAndData.owner];
+        if(block.timestamp > accountInfo_.deadline) { revert InvalidDeadline(""); }
+        
+        // revert(uint256(uint160(paymasterAndData.owner)).toString());
+        // revert(uint256(_accountInfo[paymasterAndData.owner].assetBalance[paymasterAndData.asset]).toString());
+        
+        // Transfer amount of asset to receiver
+        bool success_;
+        address asset_ = paymasterAndData.asset;
+        if(accountInfo_.assetBalance[asset_] < paymasterAndData.amount) { 
+            revert InsufficentFunds(paymasterAndData.owner, asset_, paymasterAndData.amount);
+        }
+
+        if(asset_ == address(0)) { // address(0) == ETH
+            (success_,) = payable(receiver_).call{value: paymasterAndData.amount}("");
+        } else {
+            // insufficent address(this) balance will auto-revert
+            payload_ = abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)", 
+                address(this), 
+                receiver_, 
+                paymasterAndData.amount
+            );
+            assembly {
+                success_ := call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0, 0)
+            }
+        }
+        if(!success_) { 
+            revert PaymasterPaymentFailed(
+                receiver_, 
+                asset_, 
+                paymasterAndData.owner, 
+                paymasterAndData.amount
+            );
+        }
+        accountInfo_.history[accountInfo_.nonce] = Payment(
+            block.timestamp,
+            paymasterAndData.amount,
+            uint256(0),
+            paymasterAndData.chainId,
+            asset_,
+            receiver_
+        );
+        accountInfo_.nonce++;
+
+        uint256 escrowBalance_;
+        
+        if(asset_ == address(0)) {
+            escrowBalance_ = address(this).balance;
+        } else {
+            payload_ = abi.encodeWithSignature("balanceOf(address)", address(this));
+            assembly {
+                pop(call(gas(), asset_, 0, add(payload_, 0x20), mload(payload_), 0, 0x20))
+                returndatacopy(0, 0, 0x20)
+                escrowBalance_ := mload(0)
+            }
+        }
+
+        _escrowBalance[asset_] = escrowBalance_;
+
+        emit PrintUserOp(mUserOp, paymasterAndData);
     }
 
     function handleMessage(Client.Any2EVMMessage memory message) payable external locked {

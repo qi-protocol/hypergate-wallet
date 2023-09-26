@@ -11,6 +11,7 @@ remappings = [
     "@openzeppelin/=lib/openzeppelin-contracts/",
     "openzeppelin/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "safe-core-sdk/=lib/safe-core-sdk/",
+    "@4337/=lib/account-abstraction/contracts/"
 ]
 fs_permissions = [{ access = "read-write", path = ".secret"}, { access ="read", path="./out/"}]
 gas_reports = ["*"]
@@ -22,13 +23,24 @@ optimizer_runs = 100000
 via_ir = true
 
 [rpc_endpoints]
-fuji = "${FUJI_RPC_URL}"
-mumbai = "${MUMBAI_RPC_URL}"
-mode_testnet = "${MODE_TESTNET_RPC_URL}"
+fuji = "${}"
+INFURA_GOERLI_TEST_RPC_URL       = "${INFURA_GOERLI_TEST_RPC_URL}"
+INFURA_SEPOLIA_TEST_RPC_URL      = "${INFURA_SEPOLIA_TEST_RPC_URL}"
+INFURA_MUMBAI_TEST_RPC_URL       = "${INFURA_MUMBAI_TEST_RPC_URL}"
+INFURA_LINEA_TEST_RPC_URL        = "${INFURA_LINEA_TEST_RPC_URL}"
+INFURA_OPTIMISM_TEST_RPC_URL     = "${INFURA_OPTIMISM_TEST_RPC_URL}"
+INFURA_ARBITRUM_ONE_TEST_RPC_URL = "${INFURA_ARBITRUM_ONE_TEST_RPC_URL}"
+INFURA_PALM_TEST_RPC_RUL         = "${INFURA_PALM_TEST_RPC_RUL}"
+INFURA_FUJI_TEST_RPC_URL         = "${INFURA_FUJI_TEST_RPC_URL}"
+INFURA_NEAR_TEST_RPC_URL         = "${INFURA_NEAR_TEST_RPC_URL}"
+INFURA_AURORA_TEST_RPC_URL       = "${INFURA_AURORA_TEST_RPC_URL}"
+INFURA_STARKNET_TEST_RPC_URL     = "${INFURA_STARKNET_TEST_RPC_URL}"
+INFURA_STARKNET2_TEST_RPC_URL    = "${INFURA_STARKNET2_TEST_RPC_URL}"
+INFURA_ALFAJORES_TEST_RPC_URL    = "${INFURA_ALFAJORES_TEST_RPC_URL}"
 
 [etherscan]
-fuji = { key = "${SNOWTRACE_API_KEY}" }
-mumbai = { key = "${POLYSCAN_API_KEY}" }
+#fuji = { key = "${SNOWTRACE_API_KEY}" }
+#mumbai = { key = "${POLYSCAN_API_KEY}" }
 
 [fmt]
 line_length = 120
