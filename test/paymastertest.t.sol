@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.17;
 
-import "forge-std/Test.sol";
-
 //import {IMailbox, IIGP, TestPaymaster, IEntryPoint} from "flat/TestPaymaster2_f.sol";
 //import "contracts/interfaces/ITestEscrow.sol";
+import "forge-std/console.sol";
 
 import {LoadKey} from "test/base/loadkey.t.sol";
 
-import {IEntryPoint, EntryPoint, IAccount} from "@4337/core/EntryPoint.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IEntryPoint, EntryPoint, IAccount, UserOperation} from "@4337/core/entryPoint.sol";
 import {SimpleAccount, SimpleAccountFactory} from "@4337/samples/SimpleAccountFactory.sol";
 import {TestPaymaster} from "contracts/TestPaymaster.sol";
 import {TestEscrow} from "contracts/TestEscrow.sol";
-import "contracts/interfaces/ITestEscrow.sol";
+import {PaymasterAndData, PaymasterAndData2} from "contracts/interfaces/ITestEscrow.sol";
 
 /**
 What I need
@@ -27,6 +27,8 @@ What I need
  */
 
  contract PaymasterTest is LoadKey {
+    using ECDSA for bytes32;
+
     IEntryPoint entryPoint_;
     address entryPointAddress;
     SimpleAccountFactory simpleAccountFactory_;
@@ -72,16 +74,81 @@ What I need
         transferAmount: uint256(0)
     });
 
-    function setup() public virtual override {
-        super.setup();
+    function setUp() public virtual override {
+        super.setUp();
+        uint256 gas;
 
         entryPoint_ = new EntryPoint();
         entryPointAddress = address(entryPoint_);
 
-        simpleAccountFactory_ = new SimpleAccountFactory()
+        simpleAccountFactory_ = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
+        UserOperation memory userOp = userOpBase;
 
+        bytes memory callData_;
+        bytes memory initCode_;
+        address sender_;
+        bytes32 userOpHash;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        UserOperation[] memory userOps = new UserOperation[](1);
+        uint256 newSize;
+        address newAddress;
+        
+        // create callData:
+        // initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT+1));
+        // sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT+1);
+
+        // userOp.sender = sender_;
+        // userOp.initCode = initCode_;
+
+        // userOpHash = entryPoint_.getUserOpHash(userOp);
+        // (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
+        // userOp.signature = abi.encodePacked(r, s, v);
+        // entryPoint_.depositTo{value: 1 ether}(sender_);
+        // userOps[0] = (userOp);
+
+        // // create calldata from eoa simple account to entrypoint, to create 0x69
+        // callData_ = abi.encodeWithSelector(entryPoint_.handleOps.selector, userOps, msg.sender);
+        // callData_ = abi.encodeWithSelector(SimpleAccount.execute.selector, entryPointAddress, 0, callData_);
+
+        // newAddress = sender_;
+        // assembly {
+        //     newSize := extcodesize(newAddress)
+        // }
+        // console.log("new address", newAddress);
+        // console.log("new balance", entryPoint_.balanceOf(sender_));
+        // console.log("new address size", newSize);
+
+        // cannot create double create account due to reentrancy guard
+        initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
+        sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT);
+
+        userOp.sender = sender_;
+        userOp.initCode = initCode_;
+        userOp.callData = callData_;
+
+        userOpHash = entryPoint_.getUserOpHash(userOp);
+        (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
+        userOp.signature = abi.encodePacked(r, s, v);
+        entryPoint_.depositTo{value: 1 ether}(sender_);
+        userOps[0] = (userOp);
 
         //
+        bytes memory payload_ = abi.encodeWithSelector(bytes4(0x1fad948c), userOps, payable(address(uint160(uint256(6666)))));
+        gas = gasleft();
+        assembly {
+            pop(call(gas(), sload(entryPointAddress.slot), 0, add(payload_, 0x20), mload(payload_), 0, 0))
+        }
+        //entryPoint_.handleOps(userOps, payable(address(uint160(uint256(6666)))));
+        newAddress = sender_;
+        assembly {
+            newSize := extcodesize(newAddress)
+        }
+        console.log("new address", newAddress);
+        console.log("new balance", entryPoint_.balanceOf(sender_));
+        console.log("new address size", newSize);
+        console.log("gas used for factory deployment", gas - gasleft());
     }
 
     function testPaymaster() public {}

@@ -9,7 +9,7 @@ import "forge-std/Test.sol";
     bytes32 internal key_bytes;
     uint256 internal privateKey;
 
-    function setup() public virtual {
+    function setUp() public virtual {
         // setup private key
         string memory key = vm.readFile(".secret");
         key_bytes = vm.parseBytes32(key);
