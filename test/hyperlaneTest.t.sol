@@ -103,24 +103,18 @@ contract Deploy is Test {
         }
         eoaAddress = vm.addr(privateKey);
 
-        uint256 balanceOfVault;
-        uint256 timeLock;
-        uint256 lockedETH;
-        uint256 nonce;
-        bytes memory
-        bytes memory payload = abi.encodeWithSignature("getBalance(address,address)", eoaAddress, address(0));
-        (,recipient.call(payload)
-        bytes memory payload = abi.encodeWithSignature("getDeadline(address)", eoaAddress);
-        bytes memory payload = abi.encodeWithSignature("getNonce(address)", eoaAddress);
-        bytes memory payload = abi.encodeWithSignature("getPayment(address,uint256)", eoaAddress, nonce);
-
-        function getBalance(address account_, address asset_) public returns(uint256) {
-        return _accountInfo[account_].assetBalance[asset_];
-    }
-
-    function getDeadline(address account_) public returns(uint256) {
-        return _accountInfo[account_].deadline;
-    }
+        uint256 balanceOfVault = testVault.balance;
+        ITestEscrow escrow = ITestEscrow(recipient);
+        uint256 escrowBalane = escrow.getBalance(eoaAddress, address(0));
+        uint256 escrowDeadline = escrow.getDeadline(eoaAddress);
+        // uint256 escrowNonce = escrow.getNonce(eoaAddress);
+        // Payment escrowPayment = escrow.getPayment(eoaAddress, nonce); // added later
+        
+        console.log("",);
+        console.log("",);
+        console.log("",);
+        console.log("escrowNonce",escrowNonce);
+        console.log("",);
 
     }
 
