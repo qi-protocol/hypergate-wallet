@@ -74,17 +74,11 @@ What I need
 
     function setup() public virtual override {
         super.setup();
-        // setup private key
-        // string memory key = vm.readFile(".secret");
-        // key_bytes = vm.parseBytes32(key);
-        // assembly {
-        //     privateKey := key_bytes
-        // }
-        // eoaAddress = vm.addr(privateKey);
 
-        // needs to create entrypoint
         entryPoint_ = new EntryPoint();
         entryPointAddress = address(entryPoint_);
+
+        simpleAccountFactory_ = new SimpleAccountFactory()
 
 
         //
