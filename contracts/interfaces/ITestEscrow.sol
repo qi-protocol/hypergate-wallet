@@ -54,7 +54,7 @@ interface ITestEscrow {
     function addEntryPoint(address entryPoint_, uint64 chainId_) external;
     function addCCIPAddress(address ccip, bool state) external;
     function addHyperlaneAddress(address hyperlane, bool state) external;
-    function calldataKeccak(bytes calldata data) external pure;
+    function calldataKeccak(bytes calldata data) external pure returns(bytes32);
     function depositAndLock(address account_,  address asset_,  uint256 amount_,  uint256 seconds_,  bytes memory signature_) external;
     function deposit(address account_, address asset_, uint256 amount_) external payable;
     function extendLock(address account_, uint256 seconds_, bytes memory signature_) external;
@@ -72,7 +72,7 @@ interface ITestEscrow {
     error InvalidCCIPAddress(address badSender);
     error InvalidLayerZeroAddress(address badSender);
     error InvalidHyperlaneAddress(address badSender);
-    error InvalidChain(uint64 badDestination);
+    error InvalidChain(uint256 badDestination);
     error InvalidOwner(address owner);
     error InvalidPaymaster(address paymaster);
     error InvalidSignature(address owner, address notOwner);

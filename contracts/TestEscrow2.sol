@@ -6,6 +6,7 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {Strings} from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {Payment, PaymasterAndData, PaymasterAndData2, ITestEscrow} from "./interfaces/ITestEscrow.sol";
 
 // needs to recieve a message from ccip (UserOp, PaymasterAddress)
 // then release locked funds
@@ -13,13 +14,13 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 // chainid == block.chainid
 // validateSignature == owner
 // transfer amount to paymaster 
-contract TestEscrow is Ownable {
+contract TestEscrow is Ownable, ITestEscrow {
     using UserOperationLib for UserOperation;
     using Strings for uint256;
     using ECDSA for bytes32;
 
     mapping(address => Escrow) _accountInfo;
-    mapping(uint64 => address) _entryPoint;
+    mapping(uint256 => address) _entryPoint;
     mapping(address => bool) ccipAddress;
     mapping(address => bool) layerZeroAddress;
     mapping(address => bool) hyperlaneAddress;
@@ -32,23 +33,6 @@ contract TestEscrow is Ownable {
         uint256 nonce;
         mapping(uint256 => Payment) history;
         mapping(address => uint256) assetBalance;
-    }
-
-    struct Payment {
-        uint256 timestamp;
-        uint256 assetAmount;
-        uint256 id;
-        uint256 chainId;
-        address asset;
-        address to;
-    }
-
-    struct PaymasterAndData {
-        address paymaster;
-        uint64 chainId;
-        address asset;
-        address owner;
-        uint256 amount;
     }
 
     bool lock;
@@ -68,11 +52,11 @@ contract TestEscrow is Ownable {
     }
 
     function getNonce(address account_) public view returns(uint256) {
-        return _accountInfo(account_).nonce;
+        return _accountInfo[account_].nonce;
     }
 
-    function getPayment(address account_, uint256 nonce_) public view returns(Payment memory) {
-        return _accountInfo(account_).history[nonce_];
+    function getPayment(address account_, uint256 nonce_) public view override returns(Payment memory) {
+        return _accountInfo[account_].history[nonce_];
     }
 
     function addEntryPoint(address entryPoint_, uint64 chainId_) public onlyOwner {
@@ -112,7 +96,7 @@ contract TestEscrow is Ownable {
         return keccak256(pack(userOp));
     }
 
-    function calldataKeccak(bytes calldata data) public pure returns (bytes32 ret) {
+    function calldataKeccak(bytes calldata data) override public pure returns (bytes32 ret) {
         assembly {
             let mem := mload(0x40)
             let len := data.length
@@ -527,7 +511,8 @@ contract TestEscrow is Ownable {
         _accountInfo[account_].deadline = block.timestamp + seconds_;
     }
 
-    function hashSeconds(address account_, uint256 seconds_) public returns(bytes32) {
+    // hash is not yet sybil resistent
+    function hashSeconds(address account_, uint256 seconds_) override public view returns(bytes32) {
         return keccak256(abi.encode(account_, seconds_));
     }
 
@@ -599,7 +584,7 @@ contract TestEscrow is Ownable {
         //revert((uint256(uint160(paymasterAndData.owner))).toString());
 
         if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
-        if(paymasterAndData.chainId == uint64(0)) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.chainId == uint256(0)) { revert InvalidChain(paymasterAndData.chainId); }
         if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
         if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
 
@@ -700,7 +685,7 @@ contract TestEscrow is Ownable {
         //revert((uint256(uint160(paymasterAndData.owner))).toString());
 
         if(paymasterAndData.paymaster == address(0)) { revert InvalidPaymaster(paymasterAndData.paymaster); }
-        if(paymasterAndData.chainId == uint64(0)) { revert InvalidChain(paymasterAndData.chainId); }
+        if(paymasterAndData.chainId == uint256(0)) { revert InvalidChain(paymasterAndData.chainId); }
         if(paymasterAndData.owner == address(0)) { revert InvalidOwner(paymasterAndData.owner); }
         if(paymasterAndData.owner == address(this)) { revert InvalidOwner(paymasterAndData.owner); }
 
@@ -905,23 +890,6 @@ contract TestEscrow is Ownable {
         //     revert BalanceError(data.amount, address(this).balance);
         // }
     }
-
-    error WithdrawRejected(string);
-    error TransferFailed();
-    error InsufficentFunds(address account, address asset, uint256 amount);
-    error PaymasterPaymentFailed(address receiver, address asset, address account, uint256 amount);
-    error InvalidCCIPAddress(address badSender);
-    error InvalidLayerZeroAddress(address badSender);
-    error InvalidHyperlaneAddress(address badSender);
-    error InvalidChain(uint64 badDestination);
-    error InvalidOwner(address owner);
-    error InvalidPaymaster(address paymaster);
-    error InvalidSignature(address owner, address notOwner);
-    error InvalidTimeInput();
-    error InvalidDeltaValue();
-    error InvalidDeadline(string);
-    error BadSignature();
-    error BalanceError(uint256 requested, uint256 actual);
 
     event PrintUserOp(UserOperation userOp, PaymasterAndData paymasterAndData);
 

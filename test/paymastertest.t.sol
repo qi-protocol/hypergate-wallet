@@ -11,7 +11,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IEntryPoint, EntryPoint, IAccount, UserOperation, UserOperationLib} from "@4337/core/entryPoint.sol";
 import {SimpleAccount, SimpleAccountFactory} from "@4337/samples/SimpleAccountFactory.sol";
 import {TestPaymaster, IMailbox, IIGP} from "contracts/TestPaymaster2.sol";
-import {TestEscrow} from "contracts/TestEscrow.sol";
+import {TestEscrow} from "contracts/TestEscrow2.sol";
 import {PaymasterAndData, PaymasterAndData2} from "contracts/interfaces/ITestEscrow.sol";
 import {HyperlaneMailbox} from "contracts/test/HyperlaneMailbox.sol";
 import {HyperlaneIGP} from "contracts/test/HyperlaneIGP.sol"; 
@@ -38,9 +38,9 @@ What I need
     address simpleAccountFactoryAddress;
     SimpleAccount simpleAccount_;
     address simpleAccountAddress;
-    TestPaymaster testPaymaster_;
+    TestPaymaster _testPaymaster;
     address testPaymasterAddress;
-    TestEscrow testEscrow_;
+    TestEscrow _testEscrow;
     address testEscrowAddress;
     HyperlaneMailbox _hyperlaneMailbox;
     address hyperlaneMailboxAddress;
@@ -48,6 +48,8 @@ What I need
     address hyperlaneIGPAddress;
 
     uint256 internal constant SALT = 0x55;
+
+    address internal constant RECEIVER = address(bytes20(bytes32(keccak256("defaultReceiver"))));
 
     UserOperation public userOpBase = UserOperation({
         sender: address(0),
@@ -91,17 +93,25 @@ What I need
         simpleAccountFactory_ = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
         UserOperation memory userOp = userOpBase;
 
-        // TestPaymaster testPaymaster_ = new TestPaymaster(
-        //     IEntryPoint(entryPointAddress),//IEntryPoint entryPoint_, 
-        //     //address hyperlane_mailbox_, 
-        //     //address hyperlane_igp_,
-        //     //address defaultReceiver_
-        // );
-
         _hyperlaneMailbox = new HyperlaneMailbox(uint32(block.chainid));
         hyperlaneMailboxAddress = address(_hyperlaneMailbox);
         _hyperlaneIGP = new HyperlaneIGP(hyperlaneMailboxAddress);
         hyperlaneIGPAddress = address(_hyperlaneIGP);
+
+        _testPaymaster = new TestPaymaster(
+            IEntryPoint(entryPointAddress),//IEntryPoint entryPoint_, 
+            hyperlaneMailboxAddress,//address hyperlane_mailbox_, 
+            hyperlaneIGPAddress,//address hyperlane_igp_,
+            RECEIVER//address defaultReceiver_
+        );
+        testPaymasterAddress = address(_testPaymaster);
+
+        _testEscrow = new TestEscrow();
+        testEscrowAddress = address(_testEscrow);
+
+        // needs to execute and accept message on chain A
+        // then execute handle on chain B
+
 
         bytes memory callData_;
         bytes memory initCode_;
