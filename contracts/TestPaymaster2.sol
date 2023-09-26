@@ -52,6 +52,16 @@ contract TestPaymaster is BasePaymaster {
         uint256 amount;
     }
 
+    struct PaymasterAndData2 {
+        address paymaster;
+        address owner;
+        uint256 chainId;
+        address paymentAsset;
+        uint256 paymentAmount;
+        address transferAsset;
+        uint256 transferAmount;
+    }
+
     constructor(
         IEntryPoint entryPoint_, 
         address hyperlane_mailbox_, 
@@ -110,7 +120,7 @@ contract TestPaymaster is BasePaymaster {
         address paymentAsset_ = address(bytes20(data[72:92]));
         uint256 paymentAmount_ = uint256(bytes32(data[92:124]));
         // payable: can be anything so long as paymaster has sufficent funds
-        // TODO
+        // TODO: will enable bridge functionality
         // address transferAsset_ = address(bytes20(data[124:144]));
         // uint256 transferAmount_ = uint256(bytes32(data[144:176]));
 
