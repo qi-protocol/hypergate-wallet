@@ -8,11 +8,13 @@ import "forge-std/console.sol";
 import {LoadKey} from "test/base/loadkey.t.sol";
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IEntryPoint, EntryPoint, IAccount, UserOperation} from "@4337/core/entryPoint.sol";
+import {IEntryPoint, EntryPoint, IAccount, UserOperation, UserOperationLib} from "@4337/core/entryPoint.sol";
 import {SimpleAccount, SimpleAccountFactory} from "@4337/samples/SimpleAccountFactory.sol";
-import {TestPaymaster} from "contracts/TestPaymaster.sol";
+import {TestPaymaster, IMailbox, IIGP} from "contracts/TestPaymaster2.sol";
 import {TestEscrow} from "contracts/TestEscrow.sol";
 import {PaymasterAndData, PaymasterAndData2} from "contracts/interfaces/ITestEscrow.sol";
+import {HyperlaneMailbox} from "contracts/test/HyperlaneMailbox.sol";
+import {HyperlaneIGP} from "contracts/test/HyperlaneIGP.sol"; 
 
 /**
 What I need
@@ -28,6 +30,7 @@ What I need
 
  contract PaymasterTest is LoadKey {
     using ECDSA for bytes32;
+    using UserOperationLib for UserOperation;
 
     IEntryPoint entryPoint_;
     address entryPointAddress;
@@ -39,6 +42,10 @@ What I need
     address testPaymasterAddress;
     TestEscrow testEscrow_;
     address testEscrowAddress;
+    HyperlaneMailbox _hyperlaneMailbox;
+    address hyperlaneMailboxAddress;
+    HyperlaneIGP _hyperlaneIGP;
+    address hyperlaneIGPAddress;
 
     uint256 internal constant SALT = 0x55;
 
@@ -84,8 +91,21 @@ What I need
         simpleAccountFactory_ = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
         UserOperation memory userOp = userOpBase;
 
+        // TestPaymaster testPaymaster_ = new TestPaymaster(
+        //     IEntryPoint(entryPointAddress),//IEntryPoint entryPoint_, 
+        //     //address hyperlane_mailbox_, 
+        //     //address hyperlane_igp_,
+        //     //address defaultReceiver_
+        // );
+
+        _hyperlaneMailbox = new HyperlaneMailbox(uint32(block.chainid));
+        hyperlaneMailboxAddress = address(_hyperlaneMailbox);
+        _hyperlaneIGP = new HyperlaneIGP(hyperlaneMailboxAddress);
+        hyperlaneIGPAddress = address(_hyperlaneIGP);
+
         bytes memory callData_;
         bytes memory initCode_;
+        PaymasterAndData memory paymasterAndData_;
         address sender_;
         bytes32 userOpHash;
         uint8 v;
@@ -123,10 +143,23 @@ What I need
         // cannot create double create account due to reentrancy guard
         initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
         sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT);
+        paymasterAndData_ = paymasterAndDataBase;
+        paymasterAndData_.paymaster = address(0);
+        paymasterAndData_.owner = address(0);
+        paymasterAndData_.chainId = uint256(0);
+        paymasterAndData_.asset = address(0);
+        paymasterAndData_.amount = uint256(0);
 
         userOp.sender = sender_;
         userOp.initCode = initCode_;
-        userOp.callData = callData_;
+        userOp.callData = callData_; // null for now
+        userOp.paymasterAndData = abi.encodePacked(
+            paymasterAndData_.paymaster,
+            paymasterAndData_.owner,
+            paymasterAndData_.chainId,
+            paymasterAndData_.asset,
+            paymasterAndData_.amount
+        );
 
         userOpHash = entryPoint_.getUserOpHash(userOp);
         (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
