@@ -6,6 +6,8 @@ import "forge-std/Test.sol";
 //import {IMailbox, IIGP, TestPaymaster, IEntryPoint} from "flat/TestPaymaster2_f.sol";
 //import "contracts/interfaces/ITestEscrow.sol";
 
+import {LoadKey} from "test/base/loadkey.t.sol";
+
 import {IEntryPoint, EntryPoint, IAccount} from "@4337/core/EntryPoint.sol";
 import {SimpleAccount, SimpleAccountFactory} from "@4337/samples/SimpleAccountFactory.sol";
 import {TestPaymaster} from "contracts/TestPaymaster.sol";
@@ -24,7 +26,7 @@ What I need
 - Post video to my YouTube and share it (less than 3 mins)
  */
 
- contract PaymasterTest {
+ contract PaymasterTest is LoadKey {
     IEntryPoint entryPoint_;
     address entryPointAddress;
     SimpleAccountFactory simpleAccountFactory_;
@@ -70,8 +72,19 @@ What I need
         transferAmount: uint256(0)
     });
 
-    function setup() public {
+    function setup() public virtual override {
+        super.setup();
+        // setup private key
+        // string memory key = vm.readFile(".secret");
+        // key_bytes = vm.parseBytes32(key);
+        // assembly {
+        //     privateKey := key_bytes
+        // }
+        // eoaAddress = vm.addr(privateKey);
+
         // needs to create entrypoint
+        entryPoint_ = new EntryPoint();
+        entryPointAddress = address(entryPoint_);
 
 
         //
