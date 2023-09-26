@@ -23,10 +23,34 @@ interface ITestEscrow {
 
     struct PaymasterAndData {
         address paymaster;
-        uint64 chainId;
-        address asset;
         address owner;
+        uint256 chainId;
+        address asset;
         uint256 amount;
+    }
+
+    struct PaymasterAndData2 {
+        address paymaster;
+        address owner;
+        uint256 chainId;
+        address paymentAsset;
+        uint256 paymentAmount;
+        address transferAsset;
+        uint256 transferAmount;
+    }
+
+    struct UserOperation {
+        address sender;
+        uint256 nonce;
+        bytes initCode;
+        bytes callData;
+        uint256 callGasLimit;
+        uint256 verificationGasLimit;
+        uint256 preVerificationGas;
+        uint256 maxFeePerGas;
+        uint256 maxPriorityFeePerGas;
+        bytes paymasterAndData;
+        bytes signature;
     }
 
     function interchainSecurityModule() external view returns(address);
