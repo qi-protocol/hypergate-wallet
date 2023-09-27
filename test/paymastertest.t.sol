@@ -248,7 +248,6 @@ What I need
         userOp.callData = callData_; // null for now
         callData_ = abi.encodeWithSelector(Token.mint.selector, userOp.sender, 10000);
         callData_ = abi.encodeWithSelector(SimpleAccount.execute.selector, tokenAddress, 0, callData_);
-        callData_ = abi.encodePacked(simpleAccountAddress, callData_);
         userOp.callData = callData_;
         userOp.paymasterAndData = abi.encodePacked(
             paymasterAndData_.paymaster,
