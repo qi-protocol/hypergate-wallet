@@ -33,9 +33,9 @@ What I need
     using ECDSA for bytes32;
     using UserOperationLib for UserOperation;
 
-    IEntryPoint entryPoint_;
+    IEntryPoint _entryPoint;
     address entryPointAddress;
-    SimpleAccountFactory simpleAccountFactory_;
+    SimpleAccountFactory _simpleAccountFactory;
     address simpleAccountFactoryAddress;
     SimpleAccount simpleAccount_;
     address simpleAccountAddress;
@@ -94,10 +94,11 @@ What I need
         _token = new Token("Test Token", "TKN");
         tokenAddress = address(_token);
 
-        entryPoint_ = new EntryPoint();
-        entryPointAddress = address(entryPoint_);
+        _entryPoint = new EntryPoint();
+        entryPointAddress = address(_entryPoint);
 
-        simpleAccountFactory_ = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
+        _simpleAccountFactory = new SimpleAccountFactory(IEntryPoint(entryPointAddress));
+        simpleAccountFactoryAddress = address(_simpleAccountFactory);
 
         _hyperlaneMailbox = new HyperlaneMailbox(uint32(block.chainid));
         hyperlaneMailboxAddress = address(_hyperlaneMailbox);
@@ -105,7 +106,7 @@ What I need
         hyperlaneIGPAddress = address(_hyperlaneIGP);
 
         _testPaymaster = new TestPaymaster(
-            IEntryPoint(entryPointAddress),//IEntryPoint entryPoint_, 
+            IEntryPoint(entryPointAddress),//IEntryPoint _entryPoint, 
             hyperlaneMailboxAddress,//address hyperlane_mailbox_, 
             hyperlaneIGPAddress,//address hyperlane_igp_,
             RECEIVER//address defaultReceiver_
@@ -120,6 +121,13 @@ What I need
         testEscrowAddress = address(_testEscrow);
         _testEscrow.addEntryPoint(block.chainid, entryPointAddress);
         _testEscrow.addHyperlaneAddress(hyperlaneMailboxAddress, true);
+
+        // paymaster now have 5 ether to support pamaster normal tx and 5 ether to support funded txs
+        vm.deal(testPaymasterAddress, 5 ether);
+        _entryPoint.depositTo{value: 5 ether}(testPaymasterAddress);
+        vm.prank(testPaymasterAddress);
+        _entryPoint.addStake{value: 5 ether}(3600);
+        vm.deal(testPaymasterAddress, 5 ether);
 
         // need to provide funds to both paymaster deposit and stake
         // needs to execute and accept message on chain A
@@ -140,20 +148,20 @@ What I need
         // address newAddress;
         
         // create callData:
-        // initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT+1));
-        // sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT+1);
+        // initCode_ = abi.encodePacked(_simpleAccountFactory, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT+1));
+        // sender_ = _simpleAccountFactory.getAddress(eoaAddress, SALT+1);
 
         // userOp.sender = sender_;
         // userOp.initCode = initCode_;
 
-        // userOpHash = entryPoint_.getUserOpHash(userOp);
+        // userOpHash = _entryPoint.getUserOpHash(userOp);
         // (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
         // userOp.signature = abi.encodePacked(r, s, v);
-        // entryPoint_.depositTo{value: 1 ether}(sender_);
+        // _entryPoint.depositTo{value: 1 ether}(sender_);
         // userOps[0] = (userOp);
 
         // // create calldata from eoa simple account to entrypoint, to create 0x69
-        // callData_ = abi.encodeWithSelector(entryPoint_.handleOps.selector, userOps, msg.sender);
+        // callData_ = abi.encodeWithSelector(_entryPoint.handleOps.selector, userOps, msg.sender);
         // callData_ = abi.encodeWithSelector(SimpleAccount.execute.selector, entryPointAddress, 0, callData_);
 
         // newAddress = sender_;
@@ -161,12 +169,12 @@ What I need
         //     newSize := extcodesize(newAddress)
         // }
         // console.log("new address", newAddress);
-        // console.log("new balance", entryPoint_.balanceOf(sender_));
+        // console.log("new balance", _entryPoint.balanceOf(sender_));
         // console.log("new address size", newSize);
 
         // cannot create double create account due to reentrancy guard
-        // initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
-        // sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT);
+        // initCode_ = abi.encodePacked(_simpleAccountFactory, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
+        // sender_ = _simpleAccountFactory.getAddress(eoaAddress, SALT);
         // paymasterAndData_ = paymasterAndDataBase;
         // paymasterAndData_.paymaster = address(0);
         // paymasterAndData_.owner = address(0);
@@ -187,10 +195,10 @@ What I need
         //     paymasterAndData_.amount
         // );
 
-        // userOpHash = entryPoint_.getUserOpHash(userOp);
+        // userOpHash = _entryPoint.getUserOpHash(userOp);
         // (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
         // userOp.signature = abi.encodePacked(r, s, v);
-        // entryPoint_.depositTo{value: 1 ether}(sender_);
+        // _entryPoint.depositTo{value: 1 ether}(sender_);
         // userOps[0] = (userOp);
 
         // //
@@ -199,13 +207,13 @@ What I need
         // assembly {
         //     pop(call(gas(), sload(entryPointAddress.slot), 0, add(payload_, 0x20), mload(payload_), 0, 0))
         // }
-        // //entryPoint_.handleOps(userOps, payable(address(uint160(uint256(6666)))));
+        // //_entryPoint.handleOps(userOps, payable(address(uint160(uint256(6666)))));
         // newAddress = sender_;
         // assembly {
         //     newSize := extcodesize(newAddress)
         // }
         // console.log("new address", newAddress);
-        // console.log("new balance", entryPoint_.balanceOf(sender_));
+        // console.log("new balance", _entryPoint.balanceOf(sender_));
         // console.log("new address size", newSize);
         // console.log("gas used for factory deployment", gas - gasleft());
     }
@@ -225,20 +233,22 @@ What I need
         uint256 newSize;
         address newAddress;
 
-        initCode_ = abi.encodePacked(simpleAccountFactory_, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
-        sender_ = simpleAccountFactory_.getAddress(eoaAddress, SALT);
+        initCode_ = abi.encodePacked(_simpleAccountFactory, abi.encodeWithSignature("createAccount(address,uint256)", eoaAddress, SALT));
+        sender_ = _simpleAccountFactory.getAddress(eoaAddress, SALT);
+        simpleAccountAddress = sender_;
         paymasterAndData_ = paymasterAndDataBase;
-        paymasterAndData_.paymaster = address(0);
-        paymasterAndData_.owner = address(0);
-        paymasterAndData_.chainId = uint256(0);
+        paymasterAndData_.paymaster = testPaymasterAddress;
+        paymasterAndData_.owner = simpleAccountAddress;
+        paymasterAndData_.chainId = block.chainid;
         paymasterAndData_.asset = address(0);
-        paymasterAndData_.amount = uint256(0);
+        paymasterAndData_.amount = 0.02 ether;
 
         userOp.sender = sender_;
         userOp.initCode = initCode_;
         userOp.callData = callData_; // null for now
         callData_ = abi.encodeWithSelector(Token.mint.selector, userOp.sender);
         callData_ = abi.encodeWithSelector(SimpleAccount.execute.selector, tokenAddress, 0, callData_);
+        callData_ = abi.encodePacked(simpleAccountAddress, callData_);
         userOp.paymasterAndData = abi.encodePacked(
             paymasterAndData_.paymaster,
             paymasterAndData_.owner,
@@ -247,10 +257,10 @@ What I need
             paymasterAndData_.amount
         );
 
-        userOpHash = entryPoint_.getUserOpHash(userOp);
+        userOpHash = _entryPoint.getUserOpHash(userOp);
         (v, r, s) = vm.sign(privateKey, userOpHash.toEthSignedMessageHash());
         userOp.signature = abi.encodePacked(r, s, v);
-        entryPoint_.depositTo{value: 1 ether}(sender_);
+        _entryPoint.depositTo{value: 1 ether}(sender_);
         userOps[0] = (userOp);
 
         //
@@ -259,15 +269,28 @@ What I need
         assembly {
             pop(call(gas(), sload(entryPointAddress.slot), 0, add(payload_, 0x20), mload(payload_), 0, 0))
         }
-        //entryPoint_.handleOps(userOps, payable(address(uint160(uint256(6666)))));
+        //_entryPoint.handleOps(userOps, payable(address(uint160(uint256(6666)))));
         newAddress = sender_;
         assembly {
             newSize := extcodesize(newAddress)
         }
+
+        console.log("Token adress:", tokenAddress);
+        console.log("Simple Account address:", simpleAccountAddress);
+        console.log("Simple Account Factory address:", simpleAccountFactoryAddress);
+        console.log("EntryPoint address:", entryPointAddress);
+        console.log("HyperlaneMailbox address:", hyperlaneMailboxAddress);
+        console.log("HyperlaneIGP address:", hyperlaneIGPAddress);
+        console.log("Paymaster address:", testPaymasterAddress);
+        console.log("Escrow address:", testEscrowAddress);
+
+
         console.log("new address", newAddress);
-        console.log("new balance", entryPoint_.balanceOf(sender_));
+        console.log("new balance", _entryPoint.balanceOf(sender_));
         console.log("new address size", newSize);
         console.log("gas used for factory deployment", gas - gasleft());
+        console.log("new balance hyperlaneMailbox:", hyperlaneMailboxAddress.balance);
+        console.log("new token balance:", _token.balanceOf(userOp.sender));
     }
 
     // test the execution of assets moving from paymaster to be used by the AA account

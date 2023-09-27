@@ -98,9 +98,9 @@ contract TestPaymaster is BasePaymaster {
     internal
     override
     returns (bytes memory context, uint256 validationResult) {unchecked {
-        if(!acceptedOrigin[tx.origin]) {
-            revert InvalidOrigin(tx.origin);
-        }
+        // if(!acceptedOrigin[tx.origin]) {
+        //     revert InvalidOrigin(tx.origin);
+        // } // will be using at some later point 
 
         //requiredPreFund is already subtracted from stake
 
@@ -109,7 +109,7 @@ contract TestPaymaster is BasePaymaster {
 
         uint256 paymasterAndDataLength = data.length;
         // 124 == crosschain non-payable
-        if(paymasterAndDataLength != 124 || paymasterAndDataLength != 176) {
+        if(paymasterAndDataLength != 124 && paymasterAndDataLength != 176) {
             revert InvalidDataLength(paymasterAndDataLength);
         }
 
