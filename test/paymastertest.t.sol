@@ -238,7 +238,7 @@ What I need
         simpleAccountAddress = sender_;
         paymasterAndData_ = paymasterAndDataBase;
         paymasterAndData_.paymaster = testPaymasterAddress;
-        paymasterAndData_.owner = simpleAccountAddress;
+        paymasterAndData_.owner = eoaAddress;
         paymasterAndData_.chainId = block.chainid;
         paymasterAndData_.asset = address(0);
         paymasterAndData_.amount = 0.02 ether;
@@ -274,8 +274,38 @@ What I need
         assembly {
             newSize := extcodesize(newAddress)
         }
-        // bytes memory p = abi.encodeWithSelector(Token.mint.selector, userOp.sender, 10000);
-        // tokenAddress.call(p);
+
+        // needs to call mailbox handle
+        //  function handleDispatch(bytes32 destinationDomain, address recipientAddress, bytes calldata messageBody) external {
+        //     bytes memory payload_;
+        //     bool success;
+        //     payload_ = abi.encodeWithSignature("interchainSecurityModule()");
+        //     (success, ) = recipientAddress.call(payload_);
+        //     require(success); // hyperlane required ISM is defined (even if zero)
+        //     payload_ = abi.encodeWithSignature(
+        //         "handle(uint32,bytes32,bytes)",
+        //         destinationDomain,
+        //         msg.sender,
+        //         messageBody
+        //     );
+        //     (success, ) = recipientAddress.call(payload_);
+        //     require(success, "recipient execution failed");
+        // }
+
+        //need to put money in escrow for eoaAddress
+        vm.deal(eoaAddress, 10 ether);
+        vm.prank(eoaAddress);
+        _testEscrow.deposit{value: 5 ether}(eoaAddress, address(0), 5 ether);
+        uint256 oldDeadline = _testEscrow.getDeadline(eoaAddress);
+        bytes32 timeHash = _testEscrow.hashSeconds(eoaAddress, 3600);
+        (v, r, s) = vm.sign(privateKey, timeHash.toEthSignedMessageHash());
+        bytes memory timeSignature = abi.encodePacked(r, s, v);
+        _testEscrow.extendLock(eoaAddress, 3600, timeSignature);
+        console.log("eoadAddress:", eoaAddress);
+        console.log("lockTime:", 3600);
+
+        vm.prank(hyperlaneMailboxAddress);
+        _hyperlaneMailbox.handleDispatch(block.chainid, testEscrowAddress, abi.encode(userOp, testPaymasterAddress));
 
         console.log("Token adress:", tokenAddress);
         console.log("Simple Account address:", simpleAccountAddress);
@@ -293,7 +323,10 @@ What I need
         console.log("gas used for factory deployment", gas - gasleft());
         console.log("new balance hyperlaneMailbox:", hyperlaneMailboxAddress.balance);
         console.log("new token balance:", _token.balanceOf(userOp.sender));
+        console.log("final paymaster balance:", testPaymasterAddress.balance);
     }
+
+    // messageId 
 
     // test the execution of assets moving from paymaster to be used by the AA account
     // TODO: TBA

@@ -24,7 +24,7 @@ contract HyperlaneMailbox {
         }
     }
 
-    function handleDispatch(bytes32 destinationDomain, address recipientAddress, bytes calldata messageBody) external {
+    function handleDispatch(uint256 destinationDomain, address recipientAddress, bytes calldata messageBody) external {
         bytes memory payload_;
         bool success;
         payload_ = abi.encodeWithSignature("interchainSecurityModule()");
@@ -32,8 +32,8 @@ contract HyperlaneMailbox {
         require(success); // hyperlane required ISM is defined (even if zero)
         payload_ = abi.encodeWithSignature(
             "handle(uint32,bytes32,bytes)",
-            destinationDomain,
-            msg.sender,
+            uint32(uint256(destinationDomain)),
+            bytes32(bytes20(msg.sender)),
             messageBody
         );
         (success, ) = recipientAddress.call(payload_);
