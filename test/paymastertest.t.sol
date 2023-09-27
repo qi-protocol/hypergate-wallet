@@ -246,9 +246,10 @@ What I need
         userOp.sender = sender_;
         userOp.initCode = initCode_;
         userOp.callData = callData_; // null for now
-        callData_ = abi.encodeWithSelector(Token.mint.selector, userOp.sender);
+        callData_ = abi.encodeWithSelector(Token.mint.selector, userOp.sender, 10000);
         callData_ = abi.encodeWithSelector(SimpleAccount.execute.selector, tokenAddress, 0, callData_);
         callData_ = abi.encodePacked(simpleAccountAddress, callData_);
+        userOp.callData = callData_;
         userOp.paymasterAndData = abi.encodePacked(
             paymasterAndData_.paymaster,
             paymasterAndData_.owner,
@@ -274,6 +275,8 @@ What I need
         assembly {
             newSize := extcodesize(newAddress)
         }
+        // bytes memory p = abi.encodeWithSelector(Token.mint.selector, userOp.sender, 10000);
+        // tokenAddress.call(p);
 
         console.log("Token adress:", tokenAddress);
         console.log("Simple Account address:", simpleAccountAddress);
