@@ -71,3 +71,6 @@ TODO
 | public key                                 | nonce        | wallet    | type      |
 | ------------------------------------------ | ------------ | --------- | --------- |
 | 0xfF65689a4AEB6EaDd18caD2dE0022f8Aa18b67de | 0            | 1         | 0x1       |
+
+
+forge script script/ccipreceiver.s.sol:Deploy --broadcast --verify --rpc-url https://polygon-mumbai.infura.io/v3/341b39bd014341f1a1f7233044da3062
