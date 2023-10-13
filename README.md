@@ -23,11 +23,7 @@ It's not just another wallet. Think of it as your personal crypto wizard 🧙‍
 
 **In a nutshell:** Hypergate Wallet is your ticket to a seamless, chain-agnostic crypto experience. So, are you ready to jump into the future? 🚀
 
-Submission to ETH Global Superhack 2023 (Aug 11~13):
 
-[Project showcase](https://ethglobal.com/showcase/hypergate-wallet-h1esy)
-
-[Github Repository](https://github.com/qi-protocol/eth-superhack)
 
 TODO
 
